@@ -6,10 +6,40 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model Test {
+  id          Int    @id @default(autoincrement())
+  name        String
+  desctiption String
+}
+
+
+model idtables {
+  @@map("id_tables")
+  seq Int @id @default(autoincrement())
+  id_key String @unique @db.VarChar(100)
+  id_val Decimal @db.Decimal()
+}
+
+
+model users {
+  seq      Int      @id @default(autoincrement())
+  id       String   @unique @db.VarChar(100)
+  nickname String   @db.VarChar(100)
+  email    String   @db.VarChar(100)
+  oauths   oauths[]
+}
+
+model oauths {
+  seq      Int    @id @default(autoincrement())
+  user_seq Int
+  platform String @db.VarChar(100)
+  identify String @db.VarChar(100)
+  users    users  @relation(fields: [user_seq], references: [seq])
 }
