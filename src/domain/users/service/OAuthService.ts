@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import {firstValueFrom} from 'rxjs';
+import { PrismaClient } from '@prisma/client';
+import {idGenerate} from "../../utils/IdGenerate";
+import {HttpStatusCode} from "axios";
 
 @Injectable()
 export class OAuthService {
@@ -10,19 +13,21 @@ export class OAuthService {
     private readonly httpService: HttpService,
   ) {}
 
-  async naverLogin(code: string, state: string) {
-    const clientId = this.configService.get('NAVER_CLIENT_ID');
-    const clientSecret = this.configService.get('NAVER_CLIENT_SECRET');
-    const tokenUrl = 'https://nid.naver.com/oauth2.0/token';
-    const profileUrl = 'https://openapi.naver.com/v1/nid/me';
+  //  회원 정보 조회
+  async createNaverUser(code: string, state: string) : Promise<HttpStatusCode> {
+    const naverClientId = this.configService.get('NAVER_CLIENT_ID');
+    const naverClientSecret = this.configService.get('NAVER_CLIENT_SECRET');
+    const naverTokenUrl = this.configService.get('NAVER_TOKEN_URI');
+    const naverProfileUrl = this.configService.get('NAVER_PROFILE_URI');
+    const prisma = new PrismaClient();
 
     // 1. 코드를 이용해 액세스 토큰 요청
     const tokenResponse = await firstValueFrom(
-      this.httpService.post<any>(tokenUrl, null, {
+      this.httpService.post<any>(naverTokenUrl, null, {
         params: {
           grant_type: 'authorization_code',
-          client_id: clientId,
-          client_secret: clientSecret,
+          client_id: naverClientId,
+          client_secret: naverClientSecret,
           code,
           state,
         },
@@ -33,7 +38,7 @@ export class OAuthService {
 
     // 2. 액세스 토큰을 이용해 사용자 프로필 정보 요청
     const profileResponse = await firstValueFrom(
-      this.httpService.get<any>(profileUrl, {
+      this.httpService.get<any>(naverProfileUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
       }),
     );
@@ -41,11 +46,35 @@ export class OAuthService {
     const naverUser = profileResponse.data.response;
 
     // TODO: 사용자 정보를 DB에서 조회하거나 새로 생성하는 로직
-    // TODO: JWT 토큰 생성 및 반환 로직
+    const nowUser = await prisma.oauths.findFirst({
+      where: {
+        identify : naverUser.id
+      }
+    });
 
-    return {
-        message: '로그인 성공',
-        naverUser,
-    };
+    if (!nowUser) {
+      const id = await idGenerate("users");
+      const newUser = await prisma.users.create({
+        data : {
+          id : id,
+          nickname :"testman",
+          email : naverUser.email
+        }
+      });
+
+      await prisma.oauths.create({
+        data : {
+          platform : "NAVER",
+          identify : String(naverUser.id),
+          users: {
+            connect : {seq : newUser.seq}
+          }
+        }
+      });
+
+      return HttpStatusCode.Created;
+    } else {
+      return HttpStatusCode.Ok;
+    }
   }
 }
