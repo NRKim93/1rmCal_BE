@@ -1,9 +1,9 @@
 import {Injectable} from "@nestjs/common";
 import {HttpService} from "@nestjs/axios";
-import {ConfigService} from "@nestjs/config";
 import { PrismaClient } from "@prisma/client";
 import {HttpStatusCode} from "axios";
 import {ErrorCode} from "../../../common/exception/error-code.enum";
+import {UserJoinRequestDto} from "../dto/UserJoinRequestDto";
 
 @Injectable()
 export class UserService {
@@ -12,16 +12,18 @@ export class UserService {
     ) {}
 
     //  닉네임 입력
-    async createNickname(email:string,nickname: string):Promise<HttpStatusCode> {
+    async createNickname(dto:UserJoinRequestDto):Promise<HttpStatusCode> {
         const prisma = new PrismaClient();
 
         //  입력받은 닉네임이 db에 있는지 체크
-        const checkNicnameExists  = await prisma.users.findFirst({
+        const checkNicnameExists  = await prisma.users.findUnique({
             where: {
-                nickname: nickname,
-                email: email,
+                nickname: dto.nickName,
+                email: dto.email,
             },
         });
+
+
 
 
         if (checkNicnameExists) {
@@ -29,8 +31,8 @@ export class UserService {
         }
 
         await prisma.users.update({
-            where: {email:email},
-            data: {nickname:nickname},
+            where: {email:dto.email},
+            data: {nickname:dto.nickName},
         });
 
         return HttpStatusCode.Ok;

@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import {idGenerate} from "../../utils/IdGenerate";
 import {HttpStatusCode} from "axios";
 import {NaverTokenRequestDto} from "../dto/NaverTokenRequestDto";
+import {NaverTokenResponseDto} from "../dto/NaverTokenResponseDto";
 
 @Injectable()
 export class OAuthService {
@@ -15,7 +16,7 @@ export class OAuthService {
   ) {}
 
   //  회원 정보 조회
-  async createNaverUser(dto : NaverTokenRequestDto) : Promise<HttpStatusCode> {
+  async createNaverUser(dto : NaverTokenRequestDto) : Promise<NaverTokenResponseDto> {
     const naverClientId = this.configService.get('NAVER_CLIENT_ID');
     const naverClientSecret = this.configService.get('NAVER_CLIENT_SECRET');
     const naverTokenUrl = this.configService.get('NAVER_TOKEN_URI');
@@ -74,9 +75,9 @@ export class OAuthService {
         }
       });
 
-      return HttpStatusCode.Created;
+      return {email : newUser.email, code : HttpStatusCode.Created};
     } else {
-      return HttpStatusCode.Ok;
+      return {email : "", code : HttpStatusCode.Ok};
     }
   }
 }

@@ -45,6 +45,10 @@ export const ErrorCode = {
     HttpStatus.CONFLICT,
     '이미 존재하는 사용자입니다.',
   ),
+  NOW_USING_NICKNAME: new ErrorResponse(
+      HttpStatus.CONFLICT,
+      "이미 사용중인 닉네임 입니다. "
+  ),
   INVALID_USER_DATA: new ErrorResponse(
     HttpStatus.BAD_REQUEST,
     '유효하지 않은 사용자 데이터입니다.',

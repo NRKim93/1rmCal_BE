@@ -1,5 +1,6 @@
 import {HttpStatusCode} from "axios";
 import {ErrorCode, ErrorCodeType, ErrorResponse} from "../exception/error-code.enum";
+import { NaverTokenResponseDto } from "src/domain/users/dto/NaverTokenResponseDto";
 
 export class RsData {
     constructor(
@@ -14,9 +15,8 @@ export async function success(code : HttpStatusCode) : Promise<RsData> {
     return new RsData(code, "OK");
 }
 
-//  NG일 경우
-export async function failure(error: ErrorCodeType) : Promise<RsData> {
-    const err = ErrorCode[error];
-
-    return new RsData(err.status, err.message);
+//  HTTP_STATUS_CODE : 201일 경우
+export async function created(dto :NaverTokenResponseDto) : Promise<RsData> {
+    const email : string = dto.email;
+    return new RsData(dto.code, "OK", email);
 }
