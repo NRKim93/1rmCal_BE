@@ -9,10 +9,6 @@ export class NaverTokenRequestDto {
   @IsString()
   code: string;
 
-  @ApiProperty({
-    description: 'OAuth 인증 후 리다이렉트될 URI',
-    example: 'http://localhost:3000/auth/naver/callback'
-  })
-  @IsUrl()
-  redirect_uri: string;
+  @IsString()
+  state: string;
 } 

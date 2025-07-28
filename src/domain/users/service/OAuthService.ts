@@ -5,6 +5,7 @@ import {firstValueFrom} from 'rxjs';
 import { PrismaClient } from '@prisma/client';
 import {idGenerate} from "../../utils/IdGenerate";
 import {HttpStatusCode} from "axios";
+import {NaverTokenRequestDto} from "../dto/NaverTokenRequestDto";
 
 @Injectable()
 export class OAuthService {
@@ -14,12 +15,13 @@ export class OAuthService {
   ) {}
 
   //  회원 정보 조회
-  async createNaverUser(code: string, state: string) : Promise<HttpStatusCode> {
+  async createNaverUser(dto : NaverTokenRequestDto) : Promise<HttpStatusCode> {
     const naverClientId = this.configService.get('NAVER_CLIENT_ID');
     const naverClientSecret = this.configService.get('NAVER_CLIENT_SECRET');
     const naverTokenUrl = this.configService.get('NAVER_TOKEN_URI');
     const naverProfileUrl = this.configService.get('NAVER_PROFILE_URI');
     const prisma = new PrismaClient();
+    const {code, state} = dto;
 
     // 1. 코드를 이용해 액세스 토큰 요청
     const tokenResponse = await firstValueFrom(
@@ -57,7 +59,7 @@ export class OAuthService {
       const newUser = await prisma.users.create({
         data : {
           id : id,
-          nickname :"testman",
+          nickname :"",
           email : naverUser.email
         }
       });
