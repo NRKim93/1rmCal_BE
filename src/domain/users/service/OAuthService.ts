@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
+import {Injectable} from '@nestjs/common';
+import {ConfigService} from '@nestjs/config';
+import {HttpService} from '@nestjs/axios';
 import {firstValueFrom} from 'rxjs';
-import { PrismaClient } from '@prisma/client';
+import {PrismaClient} from '@prisma/client';
 import {idGenerate} from "../../utils/IdGenerate";
 import {HttpStatusCode} from "axios";
 import {NaverTokenRequestDto} from "../dto/NaverTokenRequestDto";
@@ -55,7 +55,7 @@ export class OAuthService {
       }
     });
 
-    if (!nowUser) {
+    if (!nowUser && dto.mode === "signup") {
       const id = await idGenerate("users");
       const newUser = await prisma.users.create({
         data : {
@@ -64,6 +64,7 @@ export class OAuthService {
           email : naverUser.email
         }
       });
+
 
       await prisma.oauths.create({
         data : {
@@ -76,6 +77,8 @@ export class OAuthService {
       });
 
       return {email : newUser.email, code : HttpStatusCode.Created};
+    } else if(!nowUser && dto.mode ==="login") {
+      return {email : naverUser.email, code : HttpStatusCode.Created};
     } else {
       return {email : "", code : HttpStatusCode.Ok};
     }

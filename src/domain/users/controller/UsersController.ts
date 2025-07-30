@@ -17,6 +17,8 @@ export class UsersController {
     @Get('/naver/createNaverUser')
     @ApiOperation({ summary: '네이버 OAuth 로그인 콜백' })
     async createNaverUser(@Query() dto: NaverTokenRequestDto) {
+        console.log(dto);
+
         const naverUser = await this.oauthService.createNaverUser(dto);
         // TODO: 프론트엔드로 리다이렉트 또는 토큰 반환
 

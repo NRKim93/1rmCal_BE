@@ -11,4 +11,7 @@ export class NaverTokenRequestDto {
 
   @IsString()
   state: string;
+
+  @IsString()
+  mode: string;
 } 
