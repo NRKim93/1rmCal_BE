@@ -19,14 +19,13 @@ model Test {
   desctiption String
 }
 
-
 model idtables {
-  @@map("id_tables")
-  seq Int @id @default(autoincrement())
+  seq    Int    @id @default(autoincrement())
   id_key String @unique @db.VarChar(100)
-  id_val Decimal @db.Decimal()
-}
+  id_val Int
 
+  @@map("id_tables")
+}
 
 model users {
   seq      Int      @id @default(autoincrement())

@@ -1,39 +1,27 @@
 import {Injectable} from "@nestjs/common";
-import {HttpService} from "@nestjs/axios";
-import { PrismaClient } from "@prisma/client";
 import {HttpStatusCode} from "axios";
 import {ErrorCode} from "../../../common/exception/error-code.enum";
 import {UserJoinRequestDto} from "../dto/UserJoinRequestDto";
+import {PrismaService} from "../../../common/service/PrismaService";
+import {UserRepository} from "../repository/UserRepository";
 
 @Injectable()
 export class UserService {
     constructor(
-       private readonly httpService: HttpService
+        private readonly userRepository : UserRepository
     ) {}
 
     //  닉네임 입력
     async createNickname(dto:UserJoinRequestDto):Promise<HttpStatusCode> {
-        const prisma = new PrismaClient();
-
         //  입력받은 닉네임이 db에 있는지 체크
-        const checkNicnameExists  = await prisma.users.findUnique({
-            where: {
-                nickname: dto.nickName,
-                email: dto.email,
-            },
-        });
-
-
+        const  checkNicnameExists = await this.userRepository.checkNickname(dto.nickName,dto.email);
 
 
         if (checkNicnameExists) {
             throw ErrorCode.NOW_USING_NICKNAME;
         }
 
-        await prisma.users.update({
-            where: {email:dto.email},
-            data: {nickname:dto.nickName},
-        });
+        await this.userRepository.setNickName(dto.nickName,dto.email);
 
         return HttpStatusCode.Ok;
     }
