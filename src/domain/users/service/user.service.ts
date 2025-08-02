@@ -1,9 +1,9 @@
 import {Injectable} from "@nestjs/common";
 import {HttpStatusCode} from "axios";
 import {ErrorCode} from "../../../common/exception/error-code.enum";
-import {UserJoinRequestDto} from "../dto/UserJoinRequestDto";
+import {UserJoinRequestDto} from "../dto/user-join-request.dto";
 import {PrismaService} from "../../../common/service/PrismaService";
-import {UserRepository} from "../repository/UserRepository";
+import {UserRepository} from "../repository/user.repository";
 
 @Injectable()
 export class UserService {

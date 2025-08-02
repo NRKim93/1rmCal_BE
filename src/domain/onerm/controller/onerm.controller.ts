@@ -1,5 +1,5 @@
 import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
-import { OnermService } from '../service/OnermService';
+import { OnermService } from '../service/onerm.service';
 
 interface CalculateRequest {
   weight: number;

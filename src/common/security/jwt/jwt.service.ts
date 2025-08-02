@@ -10,7 +10,8 @@ export class JwtService {
     private readonly jwtService: NestJwtService,
   ) {}
 
-  async generateToken(payload: any): Promise<string> {
+  //  AccessToken 생성
+  async generateAccessToken(payload: any): Promise<string> {
     const privateKeyBase64 = this.configService.get<string>('JWT_PRIVATE_KEY');
 
     if(!privateKeyBase64) {
@@ -25,6 +26,7 @@ export class JwtService {
     });
   }
 
+  //  AccessToken 인증
   async verifyToken(token: string): Promise<any> {
     const publicKeyBase64 = this.configService.get<string>('JWT_PUBLIC_KEY');
 

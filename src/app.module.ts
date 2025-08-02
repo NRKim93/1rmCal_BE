@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { OnermModule } from './domain/onerm/OnermModule';
+import { OnermModule } from './domain/onerm/onerm.module';
 import { ConfigModule } from '@nestjs/config';
-import { UsersModule } from './domain/users/UsersModule';
+import { UsersModule } from './domain/users/users.module';
 
 @Module({
   imports: [

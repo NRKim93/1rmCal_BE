@@ -1,17 +1,17 @@
 import {Body, Controller, Get, Post, Query} from '@nestjs/common';
 import {ApiOperation, ApiTags} from '@nestjs/swagger';
-import {OAuthService} from '../service/OAuthService';
+import {OauthService} from '../service/oauth.service';
 import {created, RsData, success} from "../../../common/rsData/RsData";
-import {UserService} from "../service/UserService";
-import {NaverTokenRequestDto} from "../dto/NaverTokenRequestDto";
-import {UserJoinRequestDto} from "../dto/UserJoinRequestDto";
+import {UserService} from "../service/user.service";
+import {NaverTokenRequestDto} from "../dto/naver-token-request.dto";
+import {UserJoinRequestDto} from "../dto/user-join-request.dto";
 import {HttpStatusCode} from "axios";
 
 @ApiTags('Users')
 @Controller('/api/v1/users')
 export class UsersController {
     constructor(
-        private readonly oauthService: OAuthService,
+        private readonly oauthService: OauthService,
         private readonly userService: UserService,
     ) {}
     @Get('/naver/createNaverUser')

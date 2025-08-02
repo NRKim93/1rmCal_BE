@@ -1,15 +1,15 @@
 import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {HttpStatusCode} from "axios";
-import {NaverTokenRequestDto} from "../dto/NaverTokenRequestDto";
-import {NaverTokenResponseDto} from "../dto/NaverTokenResponseDto";
-import {OauthRepository} from "../repository/OauthRepository";
+import {NaverTokenRequestDto} from "../dto/naver-token-request.dto";
+import {NaverTokenResponseDto} from "../dto/naver-token-response.dto";
+import {OauthRepository} from "../repository/oauth.repository";
 import { OauthTokenService } from 'src/common/service/OauthTokenService';
-import {UserRepository} from "../repository/UserRepository";
+import {UserRepository} from "../repository/user.repository";
 import {IdGenerate} from "../../../common/utils/IdGenerate";
 
 @Injectable()
-export class OAuthService {
+export class OauthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly oauthTokenService : OauthTokenService,

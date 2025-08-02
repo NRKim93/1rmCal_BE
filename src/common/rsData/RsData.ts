@@ -1,6 +1,6 @@
 import {HttpStatusCode} from "axios";
 import {ErrorCode, ErrorCodeType, ErrorResponse} from "../exception/error-code.enum";
-import { NaverTokenResponseDto } from "src/domain/users/dto/NaverTokenResponseDto";
+import { NaverTokenResponseDto } from "src/domain/users/dto/naver-token-response.dto";
 
 export class RsData {
     constructor(
