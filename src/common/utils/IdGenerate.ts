@@ -6,30 +6,10 @@ export class IdGenerate {
     constructor(private readonly repository : UtilRepository) {}
 
     async idGenerate(key: string): Promise<string>{
-
-
-        /*    const idValue = await prisma.idtables.findFirstOrThrow({
-                select:{
-                  id_val:true
-                },
-                where: {
-                    id_key : key
-                }
-            })*/
-
         const  idValue = await this.repository.idGenerate(key);
 
         const newId = String(idValue).padStart(4, '0');
         const id = `THE_GYM_${newId}`;
-
-        /*await prisma.idtables.update({
-            where : {
-                id_key : key
-            },
-            data : {
-                id_val : idValue.id_val.toNumber() +1
-            }
-        })*/
 
         await this.repository.setId(key);
 
