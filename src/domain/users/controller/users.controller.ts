@@ -1,4 +1,4 @@
-import {Body, Controller, Get, Post, Query} from '@nestjs/common';
+import {Body, Controller, Get, Post, Query, Res} from '@nestjs/common';
 import {ApiOperation, ApiTags} from '@nestjs/swagger';
 import {OauthService} from '../service/oauth.service';
 import {created, RsData, success} from "../../../common/rsData/RsData";
@@ -6,6 +6,7 @@ import {UserService} from "../service/user.service";
 import {NaverTokenRequestDto} from "../dto/naver-token-request.dto";
 import {UserJoinRequestDto} from "../dto/user-join-request.dto";
 import {HttpStatusCode} from "axios";
+import {Response} from "express";
 
 @ApiTags('Users')
 @Controller('/api/v1/users')
@@ -16,8 +17,8 @@ export class UsersController {
     ) {}
     @Get('/naver/createNaverUser')
     @ApiOperation({ summary: '네이버 OAuth 로그인 콜백' })
-    async createNaverUser(@Query() dto: NaverTokenRequestDto) {
-        const naverUser = await this.oauthService.createNaverUser(dto);
+    async createNaverUser(@Query() dto: NaverTokenRequestDto, @Res({passthrough : true}) res: Response) {
+        const naverUser = await this.oauthService.createNaverUser(dto,res);
         // TODO: 프론트엔드로 리다이렉트 또는 토큰 반환
 
         if(naverUser.code == HttpStatusCode.Created) return await created(naverUser);

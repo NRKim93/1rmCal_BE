@@ -1,10 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import {ValidationPipe} from "@nestjs/common";
+import {corsConfig} from "./common/security/cors.config";
+import {CookieUtil} from "./common/utils/cookie.util";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  app.enableCors(corsConfig);
   app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
@@ -13,6 +15,7 @@ async function bootstrap() {
       }),
   );
 
+  CookieUtil.useCookieParser(app);
   await app.listen(process.env.PORT ?? 3001);
 }
 
