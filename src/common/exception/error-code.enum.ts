@@ -41,6 +41,11 @@ export const ErrorCode = {
         'Refresh Token이 존재하지 않습니다.',
     ),
 
+    NOT_ACCESS_TOKEN: new ErrorResponse(
+        HttpStatus.BAD_REQUEST,
+        'Access Token이 아닙니다.',
+    ),
+
     NOT_REFRESH_TOKEN: new ErrorResponse(
         HttpStatus.BAD_REQUEST,
         'Refresh Token이 아닙니다.',

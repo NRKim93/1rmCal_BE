@@ -46,7 +46,7 @@ export class OauthService {
     const naverUser = profileResponse.data.response;
 
     // TODO: 사용자 정보를 DB에서 조회하거나 새로 생성하는 로직
-    const nowUser =await this.oauthRepository.findNaverUser(naverUser);
+    const nowUser =await this.oauthRepository.findNaverUser(naverUser.email);
 
     //  회원 가입 통해서 왔으며, 신규 유저인 경우
     if (!nowUser && dto.mode === "signup") {
@@ -62,10 +62,8 @@ export class OauthService {
       const domain = this.configService.get('COOKIE_DOMAIN');
 
       //  이미 회원인 경우엔 토큰 생성
-      await this.jwtService.generateAccessToken(res,nowUser.id);
-      await this.jwtService.generateRefreshToken(res,nowUser.id);
-
-
+      await this.jwtService.generateAccessToken(res,nowUser.identify);
+      await this.jwtService.generateRefreshToken(res,nowUser.identify);
 
       return {email : "", code : HttpStatusCode.Ok};
     }
