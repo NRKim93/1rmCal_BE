@@ -9,6 +9,9 @@ export class OauthRepository {
 
     async findNaverUser(naverUser : {id:string}) : Promise<any> {
         return this.prisma.oauths.findFirst({
+            include: {
+                users : true
+            },
             where : {
                 identify : naverUser.id
             }

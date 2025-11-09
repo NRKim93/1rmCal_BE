@@ -20,10 +20,11 @@ export class UsersController {
     async createNaverUser(@Query() dto: NaverTokenRequestDto, @Res({passthrough : true}) res: Response) {
         const naverUser = await this.oauthService.createNaverUser(dto,res);
         // TODO: 프론트엔드로 리다이렉트 또는 토큰 반환
+        console.log(naverUser);
 
         if(naverUser.code == HttpStatusCode.Created) return await created(naverUser);
 
-        return await success(naverUser.code);
+        return await success(naverUser);
     }
 
     @Post('/setNickname')

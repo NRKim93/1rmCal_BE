@@ -54,18 +54,23 @@ export class OauthService {
       const newUser = await this.userRepository.createNewUser(id, naverUser, "NAVER");
 
       return {email : newUser.email, code : HttpStatusCode.Created};
-    } else if(!nowUser && dto.mode ==="login") {
+    }
+
+    if(!nowUser && dto.mode ==="login") {
       //  로그인 버튼 통해서 왔지만 회원이 아닌경우
       return {email : naverUser.email, code : HttpStatusCode.Created};
-    } else {
+    }
       const cookieExpire = this.configService.get('COOKIE_EXPIRE_TIME');
       const domain = this.configService.get('COOKIE_DOMAIN');
 
-      //  이미 회원인 경우엔 토큰 생성
+      //  이미 회원인 경우엔 토큰 생성 후 dto에 반환값 설정.
+
+
       await this.jwtService.generateAccessToken(res,nowUser.identify);
       await this.jwtService.generateRefreshToken(res,nowUser.identify);
 
-      return {email : "", code : HttpStatusCode.Ok};
+      console.log(nowUser);
+
+      return {email:nowUser.users.email , seq: nowUser.users.seq ,code : HttpStatusCode.Ok};
     }
-  }
 }

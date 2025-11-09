@@ -28,11 +28,13 @@ model idtables {
 }
 
 model users {
-  seq      Int      @id @default(autoincrement())
-  id       String   @unique @db.VarChar(100)
-  nickname String   @db.VarChar(100)
-  email    String   @unique @db.VarChar(100)
-  oauths   oauths[]
+  seq              Int                @id @default(autoincrement())
+  id               String             @unique @db.VarChar(100)
+  nickname         String             @db.VarChar(100)
+  email            String             @unique @db.VarChar(100)
+  oauths           oauths[]
+  traing           training[]
+  training_history training_history[]
 }
 
 model oauths {
@@ -41,4 +43,59 @@ model oauths {
   platform String @db.VarChar(100)
   identify String @db.VarChar(100)
   users    users  @relation(fields: [user_seq], references: [seq])
+}
+
+model training_category {
+  seq             Int    @id @default(autoincrement())
+  training_name   String @db.VarChar(100)
+  training_type   String @db.VarChar(100)
+  target_category String @db.VarChar(100)
+  target_muscle   String @db.VarChar(100)
+}
+
+enum training_type {
+  FREE_WEIGHT
+  MACHINE
+}
+
+enum target_category {
+  UPPER
+  LOWER
+}
+
+enum target_muscle {
+  CHEST
+  UPPER_BACK
+  LOWER_BACK
+  DELTOID
+  LOWER
+}
+
+model onerm {
+  seq           Int      @id @default(autoincrement())
+  author        String   @db.VarChar(100)
+  training_name String   @db.VarChar(100)
+  weight        Decimal  @db.Decimal(5, 2)
+  createdAt     DateTime @db.DateTime()
+}
+
+model training {
+  seq              Int                @id @default(autoincrement())
+  user_seq         Int
+  users            users              @relation(fields: [user_seq], references: [seq])
+  training_date    DateTime           @default(now()) @db.Timestamp(0)
+  training_history training_history[]
+}
+
+model training_history {
+  seq          Int      @id @default(autoincrement())
+  training_seq Int
+  user_seq     Int
+  name         String   @db.VarChar(100)
+  weight       Decimal  @db.Decimal()
+  weight_unit  String   @db.VarChar(3)
+  reps         Decimal  @db.Decimal()
+  rest         DateTime @db.Time()
+  training     training @relation(fields: [training_seq], references: [seq])
+  users        users    @relation(fields: [user_seq], references: [seq])
 }
