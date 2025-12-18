@@ -22,6 +22,7 @@ export class TrainingRepository {
                     weight:true,
                     weight_unit:true,
                     reps:true,
+                    sets:true,
                     rest:true
                 }
             },

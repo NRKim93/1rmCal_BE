@@ -95,6 +95,7 @@ model training_history {
   weight       Decimal  @db.Decimal()
   weight_unit  String   @db.VarChar(3)
   reps         Decimal  @db.Decimal()
+  sets         Decimal  @db.Decimal()
   rest         DateTime @db.Time()
   training     training @relation(fields: [training_seq], references: [seq])
   users        users    @relation(fields: [user_seq], references: [seq])
