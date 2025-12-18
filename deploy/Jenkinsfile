@@ -58,6 +58,11 @@ pipeline {
             foreach (\$p in @('node_modules', 'dist')) {
               if (Test-Path \$p) { Remove-Item -Recurse -Force \$p }
             }
+
+            # TypeScript incremental cache can cause missing emits when dist is wiped.
+            Get-ChildItem -Force -Filter '*.tsbuildinfo' -ErrorAction SilentlyContinue | ForEach-Object {
+              try { Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath \$_.FullName } catch { }
+            }
           }
 
           node -v
@@ -67,6 +72,8 @@ pipeline {
           npm run build
 
           if (!(Test-Path 'dist\\main.js')) { throw 'Missing dist\\main.js' }
+          if (!(Test-Path 'dist\\app.module.js')) { throw 'Missing dist\\app.module.js' }
+          if (!(Test-Path 'dist\\domain\\users\\service\\oauth.service.js')) { throw 'Missing dist\\domain\\users\\service\\oauth.service.js' }
         """
       }
     }
