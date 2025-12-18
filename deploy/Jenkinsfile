@@ -25,6 +25,9 @@ pipeline {
 
     // Jenkins SSH credential id
     UMPC_SSH_CRED_ID = 'umpc-ssh-key'
+
+    // Jenkins "Secret file" credential id that contains the backend .env
+    ENV_FILE_CRED_ID = 'onerm-backend-env'
   }
 
   stages {
@@ -133,11 +136,14 @@ module.exports = {
 
     stage('Deploy to UMPC over SSH') {
       steps {
-        withCredentials([sshUserPrivateKey(
-          credentialsId: "${env.UMPC_SSH_CRED_ID}",
-          keyFileVariable: 'SSH_KEY',
-          usernameVariable: 'SSH_USER'
-        )]) {
+        withCredentials([
+          sshUserPrivateKey(
+            credentialsId: "${env.UMPC_SSH_CRED_ID}",
+            keyFileVariable: 'SSH_KEY',
+            usernameVariable: 'SSH_USER'
+          ),
+          file(credentialsId: "${env.ENV_FILE_CRED_ID}", variable: 'ENV_FILE')
+        ]) {
           powershell '''
             $ErrorActionPreference = 'Stop'
             chcp 65001 | Out-Null
@@ -183,14 +189,17 @@ module.exports = {
             $appName   = [string]$env:UMPC_APP_NAME
             $port      = [string]$env:APP_PORT
             $artifact  = [string]$env:ARTIFACT_NAME
+            $envFile   = [string]$env:ENV_FILE
 
             $dest = ("{0}@{1}" -f $user, $umpcHost).Trim()
             $remoteTgz = "$remoteTmp/$artifact"
+            $remoteEnv = "$remoteTmp/.env"
 
             Write-Host "SSH_USER=[$user]"
             Write-Host "UMPC_HOST=[$umpcHost]"
             Write-Host "DEST=[$dest]"
             Write-Host "SSH_KEY=[****]"
+            Write-Host "ENV_FILE=[****]"
 
             function Run-External([string]$exe, [object[]]$arguments) {
               $prevEap = $ErrorActionPreference
@@ -314,6 +323,25 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
             )
 
             # 2) 아티팩트 업로드
+            # upload .env (from Jenkins Secret file credential)
+            if ([string]::IsNullOrWhiteSpace($envFile)) { throw "ENV_FILE is empty (check Jenkins file credential id: [$($env:ENV_FILE_CRED_ID)])" }
+            if (!(Test-Path -LiteralPath $envFile)) { throw "ENV_FILE not found: [$envFile]" }
+
+            Run-External 'scp' @(
+              '-i', $key,
+              '-o', 'IdentitiesOnly=yes',
+              '-o', 'BatchMode=yes',
+              '-o', 'ConnectTimeout=10',
+              '-o', 'ConnectionAttempts=1',
+              '-o', 'ServerAliveInterval=15',
+              '-o', 'ServerAliveCountMax=2',
+              '-o', 'LogLevel=ERROR',
+              '-o', 'StrictHostKeyChecking=no',
+              '-o', 'UserKnownHostsFile=NUL',
+              $envFile,
+              "${dest}:$remoteEnv"
+            )
+
             Run-External 'scp' @(
               '-i', $key,
               '-o', 'IdentitiesOnly=yes',
@@ -341,14 +369,16 @@ chcp 65001 | Out-Null
 `$name   = '$appName'
 `$port   = '$port'
 `$bundle = Join-Path `$tmp '$artifact'
+`$envSrc = Join-Path `$tmp '.env'
 
 if (!(Test-Path `$bundle)) { throw ('bundle missing: ' + `$bundle) }
+if (!(Test-Path `$envSrc)) { throw ('env missing: ' + `$envSrc) }
 
-# preserve .env if it exists (common for backend secrets)
-`$prevEnv = Join-Path `$tmp ('.env.backup.' + (Get-Date -Format yyyyMMdd_HHmmss))
+# backup existing env (if present), then overwrite with Jenkins-provided env
 `$appEnv  = Join-Path `$app '.env'
 if (Test-Path `$appEnv) {
-  Copy-Item -Force `$appEnv `$prevEnv
+  `$bkEnv = Join-Path `$tmp ('.env.backup.' + (Get-Date -Format yyyyMMdd_HHmmss))
+  Copy-Item -Force `$appEnv `$bkEnv
 }
 
 if (Test-Path `$app) {
@@ -358,10 +388,7 @@ if (Test-Path `$app) {
 
 New-Item -ItemType Directory -Force -Path `$app | Out-Null
 tar -xzf `$bundle -C `$app
-
-if ((Test-Path `$prevEnv) -and !(Test-Path (Join-Path `$app '.env'))) {
-  Copy-Item -Force `$prevEnv (Join-Path `$app '.env')
-}
+Copy-Item -Force `$envSrc (Join-Path `$app '.env')
 
  # --- ensure pm2 is available (PATH-independent) ---
  `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
