@@ -1,6 +1,9 @@
 pipeline {
   agent any
-  options { timestamps() }
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
 
   parameters {
     booleanParam(name: 'CLEAN_BUILD', defaultValue: true, description: 'Clean build (remove node_modules/dist)')
@@ -33,7 +36,7 @@ pipeline {
   stages {
 
     stage('Clean Workspace') {
-      steps { cleanWs() }
+      steps { cleanWs disableDeferredWipeout: true }
     }
 
     stage('Checkout Source (GitHub)') {
@@ -501,7 +504,7 @@ Copy-Item -Force `$envSrc (Join-Path `$app '.env')
     }
 
     stage('Clean Workspace (after)') {
-      steps { cleanWs() }
+      steps { cleanWs disableDeferredWipeout: true }
     }
   }
 
