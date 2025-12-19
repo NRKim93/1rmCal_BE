@@ -176,6 +176,7 @@ module.exports = {
             # OpenSSH (Windows) rejects keys with permissive ACLs (UNPROTECTED PRIVATE KEY FILE).
             # Jenkins writes credentials to a temp file that can be "too open", so copy + lock it down.
             $keySecure = $null
+            $envFileSecure = $null
             $keySecure = Join-Path $env:TEMP ("jenkins_sshkey_" + ([guid]::NewGuid().ToString('N')))
             Copy-Item -Force -LiteralPath $key -Destination $keySecure
             try {
@@ -330,6 +331,12 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
             if ([string]::IsNullOrWhiteSpace($envFile)) { throw "ENV_FILE is empty (check Jenkins file credential id: [$($env:ENV_FILE_CRED_ID)])" }
             if (!(Test-Path -LiteralPath $envFile)) { throw "ENV_FILE not found: [$envFile]" }
 
+            # The file credential is materialized under WORKSPACE@tmp/secretFiles/... and can disappear if workspace cleanup races.
+            # Copy it to a stable temp path for the duration of this step.
+            $envFileSecure = Join-Path $env:TEMP ("jenkins_envfile_" + ([guid]::NewGuid().ToString('N')) + ".env")
+            Copy-Item -Force -LiteralPath $envFile -Destination $envFileSecure
+            if (!(Test-Path -LiteralPath $envFileSecure)) { throw "Failed to copy ENV_FILE to temp: [$envFileSecure]" }
+
             Run-External 'scp' @(
               '-i', $key,
               '-o', 'IdentitiesOnly=yes',
@@ -341,7 +348,7 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
               '-o', 'LogLevel=ERROR',
               '-o', 'StrictHostKeyChecking=no',
               '-o', 'UserKnownHostsFile=NUL',
-              $envFile,
+              $envFileSecure,
               "${dest}:$remoteEnv"
             )
 
@@ -475,6 +482,9 @@ Copy-Item -Force `$envSrc (Join-Path `$app '.env')
             )
             }
             finally {
+              if ($envFileSecure -and (Test-Path -LiteralPath $envFileSecure)) {
+                Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $envFileSecure
+              }
               if ($keySecure -and (Test-Path -LiteralPath $keySecure)) {
                 Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $keySecure
               }
