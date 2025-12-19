@@ -449,14 +449,57 @@ Copy-Item -Force `$envSrc (Join-Path `$app '.env')
    }
  }
  
- Set-Location `$app
- `$env:PORT = `$port
- 
- try { & `$pm2Exe delete `$name 2>`$null | Out-Null } catch { }
- 
- if (Test-Path '.\\ecosystem.config.cjs') {
-   & `$pm2Exe start ecosystem.config.cjs
- } else {
+  Set-Location `$app
+  `$env:PORT = `$port
+  
+  # --- stop existing backend process by port (best-effort) ---
+  try {
+    `$portNum = [int]`$port
+    `$pids = @()
+
+    try {
+      # Preferred on modern Windows
+      `$conns = Get-NetTCPConnection -State Listen -LocalPort `$portNum -ErrorAction SilentlyContinue
+      foreach (`$c in (`$conns | Where-Object { `$_.OwningProcess -and `$_.OwningProcess -ne 0 })) {
+        `$pids += [int]`$c.OwningProcess
+      }
+    } catch { }
+
+    if (-not `$pids -or `$pids.Count -eq 0) {
+      # Fallback
+      `$lines = & cmd /c "netstat -ano | findstr /R /C:\":`$portNum[ ]\""
+      foreach (`$line in (`$lines | Where-Object { `$_ })) {
+        `$parts = (`$line -split '\\s+') | Where-Object { `$_ -ne '' }
+        if (`$parts.Count -ge 5) {
+          `$pid = 0
+          if ([int]::TryParse(`$parts[-1], [ref]`$pid) -and `$pid -ne 0) { `$pids += `$pid }
+        }
+      }
+    }
+
+    `$pids = `$pids | Sort-Object -Unique
+    if (`$pids -and `$pids.Count -gt 0) {
+      Write-Host ("Found existing backend PID(s) on port {0}: {1}" -f `$portNum, ((`$pids -join ', ')))
+      foreach (`$pid in `$pids) {
+        try {
+          Stop-Process -Id `$pid -Force -ErrorAction Stop
+          Write-Host ("Killed PID {0}" -f `$pid)
+        } catch {
+          Write-Host ("Failed to kill PID {0}: {1}" -f `$pid, `$_.Exception.Message)
+        }
+      }
+    } else {
+      Write-Host ("No existing PID found on port {0}" -f `$portNum)
+    }
+  } catch {
+    Write-Host ("PID kill (by port) skipped due to error: {0}" -f `$_.Exception.Message)
+  }
+
+  try { & `$pm2Exe delete `$name 2>`$null | Out-Null } catch { }
+  
+  if (Test-Path '.\\ecosystem.config.cjs') {
+    & `$pm2Exe start ecosystem.config.cjs
+  } else {
    & `$pm2Exe start dist\\main.js --name `$name
  }
  
