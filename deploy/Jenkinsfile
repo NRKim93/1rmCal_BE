@@ -254,9 +254,31 @@ module.exports = {
                   }
                 }
 
-                $stdoutText = [Text.Encoding]::UTF8.GetString(@(Get-Content -LiteralPath $outFile -Encoding Byte -ErrorAction SilentlyContinue))
-                $stderrText = [Text.Encoding]::UTF8.GetString(@(Get-Content -LiteralPath $errFile -Encoding Byte -ErrorAction SilentlyContinue))
+                function Decode-Bytes([byte[]]$bytes) {
+                  if (-not $bytes -or $bytes.Count -eq 0) { return "" }
 
+                  # Detect UTF-16LE-ish output (lots of NUL bytes)
+                  $nullCount = ($bytes | Where-Object { $_ -eq 0 }).Count
+                  if ($nullCount -gt [Math]::Floor($bytes.Count / 10)) {
+                    try { return [Text.Encoding]::Unicode.GetString($bytes) } catch { }
+                  }
+
+                  $utf8 = [Text.Encoding]::UTF8.GetString($bytes)
+
+                  # Heuristic: CP949 decoded as UTF-8 often shows as "占쏙옙..."
+                  if ($utf8 -match '占쏙옙') {
+                    try {
+                      $cp949 = [Text.Encoding]::GetEncoding(949).GetString($bytes)
+                      return $cp949
+                    } catch { }
+                  }
+
+                  return $utf8
+                }
+
+                $stdoutText = Decode-Bytes @(Get-Content -LiteralPath $outFile -Encoding Byte -ErrorAction SilentlyContinue)
+                $stderrText = Decode-Bytes @(Get-Content -LiteralPath $errFile -Encoding Byte -ErrorAction SilentlyContinue)
+ 
                 Write-TextOrClixml $stdoutText
                 Write-TextOrClixml $stderrText
 
