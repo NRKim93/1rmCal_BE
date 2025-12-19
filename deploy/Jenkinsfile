@@ -523,7 +523,7 @@ try {
   if (-not $pids -or $pids.Count -eq 0) {
     $lines = & netstat -ano 2>$null
     foreach ($line in ($lines | Where-Object { $_ })) {
-      $m = [regex]::Match($line, "^(TCP|UDP)\s+\S+:$portNum\s+\S+(?:\s+\S+)?\s+(\d+)\s*$")
+      $m = [regex]::Match($line, "^(TCP|UDP)\\s+\\S+:$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
       if ($m.Success) { $pids += [int]$m.Groups[2].Value }
     }
   }
