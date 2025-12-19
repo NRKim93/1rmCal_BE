@@ -271,23 +271,39 @@ module.exports = {
                 function Decode-Bytes([byte[]]$bytes) {
                   if (-not $bytes -or $bytes.Count -eq 0) { return "" }
 
+                  # BOM-based detection first
+                  if ($bytes.Count -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+                    try {
+                      $s = ([Text.Encoding]::UTF8.GetString($bytes))
+                      return $s.TrimStart([char]0xFEFF)
+                    } catch { }
+                  }
+                  if ($bytes.Count -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+                    try { return [Text.Encoding]::Unicode.GetString($bytes) } catch { }
+                  }
+                  if ($bytes.Count -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+                    try { return [Text.Encoding]::BigEndianUnicode.GetString($bytes) } catch { }
+                  }
+
                   # Detect UTF-16LE-ish output (lots of NUL bytes)
                   $nullCount = ($bytes | Where-Object { $_ -eq 0 }).Count
                   if ($nullCount -gt [Math]::Floor($bytes.Count / 10)) {
                     try { return [Text.Encoding]::Unicode.GetString($bytes) } catch { }
                   }
 
-                  $utf8 = [Text.Encoding]::UTF8.GetString($bytes)
+                  # Prefer strict UTF-8 (throws on invalid bytes) to avoid U+FFFD replacement chars in logs
+                  try {
+                    $utf8Strict = New-Object System.Text.UTF8Encoding($false, $true)
+                    $s = $utf8Strict.GetString($bytes)
+                    return $s.TrimStart([char]0xFEFF)
+                  } catch { }
 
-                  # Heuristic: CP949 decoded as UTF-8 often shows as "占쏙옙..."
-                  if ($utf8 -match '占쏙옙') {
-                    try {
-                      $cp949 = [Text.Encoding]::GetEncoding(949).GetString($bytes)
-                      return $cp949
-                    } catch { }
-                  }
+                  # Fallback: Korean Windows often emits CP949 for native tool output (ssh/scp stderr, etc.)
+                  try { return [Text.Encoding]::GetEncoding(949).GetString($bytes) } catch { }
 
-                  return $utf8
+                  # Last resort
+                  try { return [Text.Encoding]::Default.GetString($bytes) } catch { }
+                  return ""
                 }
 
                 $stdoutText = Decode-Bytes @(Get-Content -LiteralPath $outFile -Encoding Byte -ErrorAction SilentlyContinue)
@@ -454,11 +470,11 @@ if ($pm2Cmd) {
   $pm2Exe = $pm2Cmd.Source
 } else {
   $pm2Candidates = @(
-    (Join-Path $env:APPDATA 'npm\pm2.cmd'),
-    ('C:\Users\' + $env:USERNAME + '\AppData\Roaming\npm\pm2.cmd'),
-    'C:\ProgramData\npm\pm2.cmd',
-    'C:\Program Files\nodejs\pm2.cmd',
-    'C:\Program Files (x86)\nodejs\pm2.cmd'
+    (Join-Path $env:APPDATA 'npm/pm2.cmd'),
+    ('C:/Users/' + $env:USERNAME + '/AppData/Roaming/npm/pm2.cmd'),
+    'C:/ProgramData/npm/pm2.cmd',
+    'C:/Program Files/nodejs/pm2.cmd',
+    'C:/Program Files (x86)/nodejs/pm2.cmd'
   )
   foreach ($c in $pm2Candidates) { if (Test-Path $c) { $pm2Exe = $c; break } }
 }
@@ -470,11 +486,11 @@ if (-not $pm2Exe) {
     $npmExe = $npmCmd.Source
   } else {
     $npmCandidates = @(
-      (Join-Path $env:APPDATA 'npm\npm.cmd'),
-      ('C:\Users\' + $env:USERNAME + '\AppData\Roaming\npm\npm.cmd'),
-      'C:\ProgramData\npm\npm.cmd',
-      'C:\Program Files\nodejs\npm.cmd',
-      'C:\Program Files (x86)\nodejs\npm.cmd'
+      (Join-Path $env:APPDATA 'npm/npm.cmd'),
+      ('C:/Users/' + $env:USERNAME + '/AppData/Roaming/npm/npm.cmd'),
+      'C:/ProgramData/npm/npm.cmd',
+      'C:/Program Files/nodejs/npm.cmd',
+      'C:/Program Files (x86)/nodejs/npm.cmd'
     )
     foreach ($c in $npmCandidates) { if (Test-Path $c) { $npmExe = $c; break } }
   }
@@ -514,7 +530,7 @@ try {
   if (-not $pids -or $pids.Count -eq 0) {
     $lines = & netstat -ano 2>$null
     foreach ($line in ($lines | Where-Object { $_ })) {
-      $m = [regex]::Match($line, "^(TCP|UDP)\s+\S+:$portNum\s+\S+(?:\s+\S+)?\s+(\d+)\s*$")
+      $m = [regex]::Match($line, "^(TCP|UDP)\\s+\\S+:$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
       if ($m.Success) { $pids += [int]$m.Groups[2].Value }
     }
   }
@@ -539,10 +555,10 @@ try {
 
 try { & $pm2Exe delete $name 2>$null | Out-Null } catch { }
 
-if (Test-Path '.\ecosystem.config.cjs') {
+if (Test-Path './ecosystem.config.cjs') {
   & $pm2Exe start ecosystem.config.cjs
 } else {
-  & $pm2Exe start dist\main.js --name $name
+  & $pm2Exe start dist/main.js --name $name
 }
 
 & $pm2Exe save
