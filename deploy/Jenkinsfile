@@ -217,10 +217,8 @@ module.exports = {
               # 로그 출력(PS5.1 안전)
               $printed = ""
               foreach ($a in $arguments) { $printed += "[$a] " }
-
               Write-Host ("RUN: {0} {1}" -f $exe, $printed.Trim())
 
-              # PS 5.1?먯꽌 native stderr ?→? non-terminating error(NativeCommandError)?로 잡히는 케이스가 있어
               # Start-Process + redirect로 stdout/stderr를 안전하게 수집하고 ExitCode로 성공/실패를 판정한다.
               $outFile = [System.IO.Path]::GetTempFileName()
               $errFile = [System.IO.Path]::GetTempFileName()
@@ -269,21 +267,6 @@ module.exports = {
                 Remove-Item -Force -ErrorAction SilentlyContinue $outFile, $errFile
                 $ErrorActionPreference = $prevEap
               }
-
-              return
-
-              # 실행 + stderr/stdout 합치기
-              $output = & $exe @arguments 2>&1
-
-              # ★ 중요: 출력 찍기 전에 exit code를 먼저 저장
-              $exit = $LASTEXITCODE
-
-              foreach ($line in $output) { Write-Host $line }
-
-              $ErrorActionPreference = $prevEap
-              if ($exit -ne 0) {
-                throw "Command failed ($exit): $exe"
-              }
             }
 
             # ssh 버전 출력(참고용)
@@ -310,69 +293,78 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
                 throw "SSH key file is not an OpenSSH private key (first line: [$firstLine]). If this is a PuTTY .ppk, convert it to OpenSSH and re-upload the credential."
               }
 
-            Run-External 'ssh' @(
-              '-i', $key,
-              '-o', 'IdentitiesOnly=yes',
-              '-o', 'BatchMode=yes',
-              '-o', 'ConnectTimeout=10',
-              '-o', 'ConnectionAttempts=1',
-              '-o', 'ServerAliveInterval=15',
-              '-o', 'ServerAliveCountMax=2',
-              '-o', 'LogLevel=ERROR',
-              '-o', 'StrictHostKeyChecking=no',
-              '-o', 'UserKnownHostsFile=NUL',
-              $dest,
-              'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-              '-EncodedCommand', $mkB64
-            )
+              Run-External 'ssh' @(
+                '-i', $key,
+                '-o', 'IdentitiesOnly=yes',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'ConnectionAttempts=1',
+                '-o', 'ServerAliveInterval=15',
+                '-o', 'ServerAliveCountMax=2',
+                '-o', 'LogLevel=ERROR',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=NUL',
+                $dest,
+                'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-EncodedCommand', $mkB64
+              )
 
-            # 2) 아티팩트 업로드
-            # upload .env (from Jenkins Secret file credential)
-            if ([string]::IsNullOrWhiteSpace($envFile)) { throw "ENV_FILE is empty (check Jenkins file credential id: [$($env:ENV_FILE_CRED_ID)])" }
-            if (!(Test-Path -LiteralPath $envFile)) { throw "ENV_FILE not found: [$envFile]" }
+              # 2) 아티팩트 업로드
+              # upload .env (from Jenkins Secret file credential)
+              if ([string]::IsNullOrWhiteSpace($envFile)) { throw "ENV_FILE is empty (check Jenkins file credential id: [$($env:ENV_FILE_CRED_ID)])" }
+              if (!(Test-Path -LiteralPath $envFile)) { throw "ENV_FILE not found: [$envFile]" }
 
-            # The file credential is materialized under WORKSPACE@tmp/secretFiles/... and can disappear if workspace cleanup races.
-            # Copy it to a stable temp path for the duration of this step.
-            $envFileSecure = Join-Path $env:TEMP ("jenkins_envfile_" + ([guid]::NewGuid().ToString('N')) + ".env")
-            Copy-Item -Force -LiteralPath $envFile -Destination $envFileSecure
-            if (!(Test-Path -LiteralPath $envFileSecure)) { throw "Failed to copy ENV_FILE to temp: [$envFileSecure]" }
+              # The file credential is materialized under WORKSPACE@tmp/secretFiles/... and can disappear if workspace cleanup races.
+              # Copy it to a stable temp path for the duration of this step.
+              $envFileSecure = Join-Path $env:TEMP ("jenkins_envfile_" + ([guid]::NewGuid().ToString('N')) + ".env")
+              Copy-Item -Force -LiteralPath $envFile -Destination $envFileSecure
+              if (!(Test-Path -LiteralPath $envFileSecure)) { throw "Failed to copy ENV_FILE to temp: [$envFileSecure]" }
 
-            Run-External 'scp' @(
-              '-i', $key,
-              '-o', 'IdentitiesOnly=yes',
-              '-o', 'BatchMode=yes',
-              '-o', 'ConnectTimeout=10',
-              '-o', 'ConnectionAttempts=1',
-              '-o', 'ServerAliveInterval=15',
-              '-o', 'ServerAliveCountMax=2',
-              '-o', 'LogLevel=ERROR',
-              '-o', 'StrictHostKeyChecking=no',
-              '-o', 'UserKnownHostsFile=NUL',
-              $envFileSecure,
-              "${dest}:$remoteEnv"
-            )
+              Run-External 'scp' @(
+                '-i', $key,
+                '-o', 'IdentitiesOnly=yes',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'ConnectionAttempts=1',
+                '-o', 'ServerAliveInterval=15',
+                '-o', 'ServerAliveCountMax=2',
+                '-o', 'LogLevel=ERROR',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=NUL',
+                $envFileSecure,
+                "${dest}:$remoteEnv"
+              )
 
-            Run-External 'scp' @(
-              '-i', $key,
-              '-o', 'IdentitiesOnly=yes',
-              '-o', 'BatchMode=yes',
-              '-o', 'ConnectTimeout=10',
-              '-o', 'ConnectionAttempts=1',
-              '-o', 'ServerAliveInterval=15',
-              '-o', 'ServerAliveCountMax=2',
-              '-o', 'LogLevel=ERROR',
-              '-o', 'StrictHostKeyChecking=no',
-              '-o', 'UserKnownHostsFile=NUL',
-              $artifact,
-              "${dest}:$remoteTgz"
-            )
+              Run-External 'scp' @(
+                '-i', $key,
+                '-o', 'IdentitiesOnly=yes',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'ConnectionAttempts=1',
+                '-o', 'ServerAliveInterval=15',
+                '-o', 'ServerAliveCountMax=2',
+                '-o', 'LogLevel=ERROR',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=NUL',
+                $artifact,
+                "${dest}:$remoteTgz"
+              )
 
-            # 3) 원격 배포
-            $deploy = @"
+              # 3) 원격 배포 (✅ STOP 먼저 → BACKUP/REPLACE → START)
+              $deploy = @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
 chcp 65001 | Out-Null
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
+
+# ---- error trap (원인 로그 확보용) ----
+trap {
+  Write-Host ("REMOTE ERROR: " + `$_.Exception.Message)
+  if (`$_.InvocationInfo) {
+    Write-Host ("At: " + `$_.InvocationInfo.PositionMessage)
+  }
+  exit 1
+}
 
 `$tmp    = '$remoteTmp'
 `$app    = '$appDir'
@@ -381,145 +373,175 @@ chcp 65001 | Out-Null
 `$bundle = Join-Path `$tmp '$artifact'
 `$envSrc = Join-Path `$tmp '.env'
 
+Write-Host ("[DEPLOY] tmp=" + `$tmp)
+Write-Host ("[DEPLOY] app=" + `$app)
+Write-Host ("[DEPLOY] name=" + `$name + " port=" + `$port)
+Write-Host ("[DEPLOY] bundle=" + `$bundle)
+
 if (!(Test-Path `$bundle)) { throw ('bundle missing: ' + `$bundle) }
 if (!(Test-Path `$envSrc)) { throw ('env missing: ' + `$envSrc) }
 
-# backup existing env (if present), then overwrite with Jenkins-provided env
+# --- ensure pm2 is available (PATH-independent) ---
+`$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
+`$pm2Exe = `$null
+if (`$pm2Cmd) {
+  `$pm2Exe = `$pm2Cmd.Source
+} else {
+  `$pm2Candidates = @(
+    (Join-Path `$env:APPDATA 'npm\\pm2.cmd'),
+    ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\pm2.cmd'),
+    'C:\\ProgramData\\npm\\pm2.cmd',
+    'C:\\Program Files\\nodejs\\pm2.cmd',
+    'C:\\Program Files (x86)\\nodejs\\pm2.cmd'
+  )
+  foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
+}
+
+if (-not `$pm2Exe) {
+  `$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  `$npmExe = `$null
+  if (`$npmCmd) {
+    `$npmExe = `$npmCmd.Source
+  } else {
+    `$npmCandidates = @(
+      (Join-Path `$env:APPDATA 'npm\\npm.cmd'),
+      ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\npm.cmd'),
+      'C:\\ProgramData\\npm\\npm.cmd',
+      'C:\\Program Files\\nodejs\\npm.cmd',
+      'C:\\Program Files (x86)\\nodejs\\npm.cmd'
+    )
+    foreach (`$c in `$npmCandidates) { if (Test-Path `$c) { `$npmExe = `$c; break } }
+  }
+
+  if (-not `$npmExe) {
+    throw "pm2 not found and npm not found on UMPC. Install Node.js (with npm) or preinstall pm2 and ensure PATH is set."
+  }
+
+  Write-Host "[DEPLOY] Installing pm2 globally..."
+  & `$npmExe i -g pm2
+
+  `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
+  if (`$pm2Cmd) {
+    `$pm2Exe = `$pm2Cmd.Source
+  } else {
+    foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
+  }
+
+  if (-not `$pm2Exe) {
+    throw "pm2 installed but executable still not found. Ensure npm global bin is on PATH."
+  }
+}
+
+Write-Host ("[DEPLOY] pm2=" + `$pm2Exe)
+
+# =========================================================
+# 1) STOP FIRST (중요: appDir Move-Item 하기 전에 프로세스부터 내림)
+# =========================================================
+try {
+  Write-Host "[DEPLOY] Stop/Delete pm2 app (best-effort)..."
+  try { & `$pm2Exe stop  `$name 2>`$null | Out-Null } catch { }
+  try { & `$pm2Exe delete `$name 2>`$null | Out-Null } catch { }
+} catch { }
+
+# 포트 점유 PID kill (best-effort)
+try {
+  `$portNum = [int]`$port
+  `$pids = @()
+
+  try {
+    `$conns = Get-NetTCPConnection -State Listen -LocalPort `$portNum -ErrorAction SilentlyContinue
+    foreach (`$c in (`$conns | Where-Object { `$_.OwningProcess -and `$_.OwningProcess -ne 0 })) {
+      `$pids += [int]`$c.OwningProcess
+    }
+  } catch { }
+
+  if (-not `$pids -or `$pids.Count -eq 0) {
+    `$lines = & netstat -ano 2>`$null
+    foreach (`$line in (`$lines | Where-Object { `$_ })) {
+      `$m = [regex]::Match(`$line, "^(TCP|UDP)\\s+\\S+:`$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
+      if (`$m.Success) { `$pids += [int]`$m.Groups[2].Value }
+    }
+  }
+
+  `$pids = `$pids | Sort-Object -Unique
+  if (`$pids -and `$pids.Count -gt 0) {
+    Write-Host ("[DEPLOY] Found PID(s) on port {0}: {1}" -f `$portNum, ((`$pids -join ', ')))
+    foreach (`$pid in `$pids) {
+      try {
+        Stop-Process -Id `$pid -Force -ErrorAction Stop
+        Write-Host ("[DEPLOY] Killed PID {0}" -f `$pid)
+      } catch {
+        Write-Host ("[DEPLOY] Failed to kill PID {0}: {1}" -f `$pid, `$_.Exception.Message)
+      }
+    }
+  } else {
+    Write-Host ("[DEPLOY] No PID found on port {0}" -f `$portNum)
+  }
+} catch {
+  Write-Host ("[DEPLOY] PID kill skipped: {0}" -f `$_.Exception.Message)
+}
+
+# =========================================================
+# 2) BACKUP/REPLACE (이제 폴더 잠김 확률 줄어서 Move-Item 성공률 ↑)
+# =========================================================
+# backup existing env (if present)
 `$appEnv  = Join-Path `$app '.env'
 if (Test-Path `$appEnv) {
   `$bkEnv = Join-Path `$tmp ('.env.backup.' + (Get-Date -Format yyyyMMdd_HHmmss))
   Copy-Item -Force `$appEnv `$bkEnv
+  Write-Host ("[DEPLOY] env backup -> " + `$bkEnv)
 }
 
+# appDir backup
 if (Test-Path `$app) {
   `$bk = `$app + '.backup.' + (Get-Date -Format yyyyMMdd_HHmmss)
+  Write-Host ("[DEPLOY] app backup move -> " + `$bk)
   Move-Item -Force `$app `$bk
 }
 
 New-Item -ItemType Directory -Force -Path `$app | Out-Null
+Write-Host "[DEPLOY] Extracting bundle..."
 tar -xzf `$bundle -C `$app
+
+Write-Host "[DEPLOY] Copying .env..."
 Copy-Item -Force `$envSrc (Join-Path `$app '.env')
 
- # --- ensure pm2 is available (PATH-independent) ---
- `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
- `$pm2Exe = `$null
- if (`$pm2Cmd) {
-   `$pm2Exe = `$pm2Cmd.Source
- } else {
-   `$pm2Candidates = @(
-     (Join-Path `$env:APPDATA 'npm\\pm2.cmd'),
-     ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\pm2.cmd'),
-     'C:\\ProgramData\\npm\\pm2.cmd',
-     'C:\\Program Files\\nodejs\\pm2.cmd',
-     'C:\\Program Files (x86)\\nodejs\\pm2.cmd'
-   )
-   foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
- }
- 
- if (-not `$pm2Exe) {
-   `$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-   `$npmExe = `$null
-   if (`$npmCmd) {
-     `$npmExe = `$npmCmd.Source
-   } else {
-     `$npmCandidates = @(
-       (Join-Path `$env:APPDATA 'npm\\npm.cmd'),
-       ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\npm.cmd'),
-       'C:\\ProgramData\\npm\\npm.cmd',
-       'C:\\Program Files\\nodejs\\npm.cmd',
-       'C:\\Program Files (x86)\\nodejs\\npm.cmd'
-     )
-     foreach (`$c in `$npmCandidates) { if (Test-Path `$c) { `$npmExe = `$c; break } }
-   }
- 
-   if (-not `$npmExe) {
-     throw "pm2 not found and npm not found on UMPC. Install Node.js (with npm) or preinstall pm2 and ensure PATH is set."
-   }
- 
-   & `$npmExe i -g pm2
-   `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
-   if (`$pm2Cmd) {
-     `$pm2Exe = `$pm2Cmd.Source
-   } else {
-     foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
-   }
- 
-   if (-not `$pm2Exe) {
-     throw "pm2 installed but executable still not found. Ensure npm global bin is on PATH."
-   }
- }
- 
-  Set-Location `$app
-  `$env:PORT = `$port
-  
-  # --- stop existing backend process by port (best-effort) ---
-  try {
-    `$portNum = [int]`$port
-    `$pids = @()
+# =========================================================
+# 3) START
+# =========================================================
+Set-Location `$app
+`$env:PORT = `$port
+`$env:NODE_ENV = 'production'
 
-    try {
-      # Preferred on modern Windows
-      `$conns = Get-NetTCPConnection -State Listen -LocalPort `$portNum -ErrorAction SilentlyContinue
-      foreach (`$c in (`$conns | Where-Object { `$_.OwningProcess -and `$_.OwningProcess -ne 0 })) {
-        `$pids += [int]`$c.OwningProcess
-      }
-    } catch { }
+Write-Host "[DEPLOY] Starting pm2..."
+if (Test-Path '.\\ecosystem.config.cjs') {
+  & `$pm2Exe start ecosystem.config.cjs
+} else {
+  & `$pm2Exe start dist\\main.js --name `$name
+}
 
-    if (-not `$pids -or `$pids.Count -eq 0) {
-      # Fallback: netstat parse (avoid locale-specific state strings)
-      `$lines = & netstat -ano 2>`$null
-      foreach (`$line in (`$lines | Where-Object { `$_ })) {
-        `$m = [regex]::Match(`$line, "^(TCP|UDP)\\s+\\S+:`$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
-        if (`$m.Success) { `$pids += [int]`$m.Groups[2].Value }
-      }
-    }
+& `$pm2Exe save
+& `$pm2Exe ls --no-color
 
-    `$pids = `$pids | Sort-Object -Unique
-    if (`$pids -and `$pids.Count -gt 0) {
-      Write-Host ("Found existing backend PID(s) on port {0}: {1}" -f `$portNum, ((`$pids -join ', ')))
-      foreach (`$pid in `$pids) {
-        try {
-          Stop-Process -Id `$pid -Force -ErrorAction Stop
-          Write-Host ("Killed PID {0}" -f `$pid)
-        } catch {
-          Write-Host ("Failed to kill PID {0}: {1}" -f `$pid, `$_.Exception.Message)
-        }
-      }
-    } else {
-      Write-Host ("No existing PID found on port {0}" -f `$portNum)
-    }
-  } catch {
-    Write-Host ("PID kill (by port) skipped due to error: {0}" -f `$_.Exception.Message)
-  }
-
-  try { & `$pm2Exe delete `$name 2>`$null | Out-Null } catch { }
-  
-  if (Test-Path '.\\ecosystem.config.cjs') {
-    & `$pm2Exe start ecosystem.config.cjs
-  } else {
-   & `$pm2Exe start dist\\main.js --name `$name
- }
- 
- & `$pm2Exe save
- & `$pm2Exe ls --no-color
+Write-Host "[DEPLOY] Done."
 "@
-            $deployB64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($deploy))
+              $deployB64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($deploy))
 
-            Run-External 'ssh' @(
-              '-i', $key,
-              '-o', 'IdentitiesOnly=yes',
-              '-o', 'BatchMode=yes',
-              '-o', 'ConnectTimeout=10',
-              '-o', 'ConnectionAttempts=1',
-              '-o', 'ServerAliveInterval=15',
-              '-o', 'ServerAliveCountMax=2',
-              '-o', 'LogLevel=ERROR',
-              '-o', 'StrictHostKeyChecking=no',
-              '-o', 'UserKnownHostsFile=NUL',
-              $dest,
-              'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-              '-EncodedCommand', $deployB64
-            )
+              Run-External 'ssh' @(
+                '-i', $key,
+                '-o', 'IdentitiesOnly=yes',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'ConnectionAttempts=1',
+                '-o', 'ServerAliveInterval=15',
+                '-o', 'ServerAliveCountMax=2',
+                '-o', 'LogLevel=ERROR',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=NUL',
+                $dest,
+                'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-EncodedCommand', $deployB64
+              )
             }
             finally {
               if ($envFileSecure -and (Test-Path -LiteralPath $envFileSecure)) {
