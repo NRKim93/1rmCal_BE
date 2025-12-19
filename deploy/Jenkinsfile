@@ -466,14 +466,11 @@ Copy-Item -Force `$envSrc (Join-Path `$app '.env')
     } catch { }
 
     if (-not `$pids -or `$pids.Count -eq 0) {
-      # Fallback
-      `$lines = & cmd /c "netstat -ano | findstr /R /C:\":`$portNum[ ]\""
+      # Fallback: netstat parse (avoid locale-specific state strings)
+      `$lines = & netstat -ano 2>`$null
       foreach (`$line in (`$lines | Where-Object { `$_ })) {
-        `$parts = (`$line -split '\\s+') | Where-Object { `$_ -ne '' }
-        if (`$parts.Count -ge 5) {
-          `$pid = 0
-          if ([int]::TryParse(`$parts[-1], [ref]`$pid) -and `$pid -ne 0) { `$pids += `$pid }
-        }
+        `$m = [regex]::Match(`$line, "^(TCP|UDP)\\s+\\S+:`$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
+        if (`$m.Success) { `$pids += [int]`$m.Groups[2].Value }
       }
     }
 
