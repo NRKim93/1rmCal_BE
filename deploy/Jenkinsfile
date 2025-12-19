@@ -564,19 +564,11 @@ if (Test-Path './ecosystem.config.cjs') {
             $body = $body.Replace('__APP_PORT__', $port)
             $body = $body.Replace('__ARTIFACT__', $artifact)
 
-            $bodyB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body))
-
+            # Passing a huge -EncodedCommand to ssh can exceed Windows' command line length limit.
+            # Instead, upload a .ps1 and run it with -File on the remote host.
             $deploy = @'
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-chcp 65001 | Out-Null
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-$OutputEncoding = [Console]::OutputEncoding
-
 try {
-  $bodyB64 = '__BODY_B64__'
-  $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($bodyB64))
-  Invoke-Expression $body
+'@ + $body + @'
 } catch {
   $msg = ($_ | Out-String)
   try { $msg += "`n" + ($_.ScriptStackTrace | Out-String) } catch { }
@@ -586,8 +578,24 @@ try {
 }
 '@
 
-            $deploy = $deploy.Replace('__BODY_B64__', $bodyB64)
-            $deployB64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($deploy))
+            $deployLocal = Join-Path $env:TEMP ("jenkins_deploy_" + ([guid]::NewGuid().ToString('N')) + ".ps1")
+            $deployRemote = "$remoteTmp/deploy.ps1"
+            $deploy | Out-File -FilePath $deployLocal -Encoding utf8 -Force
+
+            Run-External 'scp' @(
+              '-i', $key,
+              '-o', 'IdentitiesOnly=yes',
+              '-o', 'BatchMode=yes',
+              '-o', 'ConnectTimeout=10',
+              '-o', 'ConnectionAttempts=1',
+              '-o', 'ServerAliveInterval=15',
+              '-o', 'ServerAliveCountMax=2',
+              '-o', 'LogLevel=ERROR',
+              '-o', 'StrictHostKeyChecking=no',
+              '-o', 'UserKnownHostsFile=NUL',
+              $deployLocal,
+              "${dest}:$deployRemote"
+            )
 
             Run-External 'ssh' @(
               '-i', $key,
@@ -602,10 +610,13 @@ try {
               '-o', 'UserKnownHostsFile=NUL',
               $dest,
               'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-              '-EncodedCommand', $deployB64
+              '-File', $deployRemote
             )
             }
             finally {
+              if ($deployLocal -and (Test-Path -LiteralPath $deployLocal)) {
+                Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $deployLocal
+              }
               if ($envFileSecure -and (Test-Path -LiteralPath $envFileSecure)) {
                 Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $envFileSecure
               }
