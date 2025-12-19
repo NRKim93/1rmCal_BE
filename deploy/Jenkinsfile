@@ -404,150 +404,166 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
             )
 
             # 3) 원격 배포
-            $deploy = @"
-`$ErrorActionPreference = 'Stop'
-`$ProgressPreference = 'SilentlyContinue'
+            # NOTE: wrap the real deploy script in Invoke-Expression so that even parse errors become catchable.
+            $deploy = @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 chcp 65001 | Out-Null
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
-`$OutputEncoding = [Console]::OutputEncoding
+$OutputEncoding = [Console]::OutputEncoding
+
+$body = @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$OutputEncoding = [Console]::OutputEncoding
+
+$tmp    = '__REMOTE_TMP__'
+$app    = '__APP_DIR__'
+$name   = '__APP_NAME__'
+$port   = '__APP_PORT__'
+$artifact = '__ARTIFACT__'
+
+$bundle = Join-Path $tmp $artifact
+$envSrc = Join-Path $tmp '.env'
+
+if (!(Test-Path $bundle)) { throw ('bundle missing: ' + $bundle) }
+if (!(Test-Path $envSrc)) { throw ('env missing: ' + $envSrc) }
+
+# backup existing env (if present), then overwrite with Jenkins-provided env
+$appEnv  = Join-Path $app '.env'
+if (Test-Path $appEnv) {
+  $bkEnv = Join-Path $tmp ('.env.backup.' + (Get-Date -Format yyyyMMdd_HHmmss))
+  Copy-Item -Force $appEnv $bkEnv
+}
+
+if (Test-Path $app) {
+  $bk = $app + '.backup.' + (Get-Date -Format yyyyMMdd_HHmmss)
+  Move-Item -Force $app $bk
+}
+
+New-Item -ItemType Directory -Force -Path $app | Out-Null
+tar -xzf $bundle -C $app
+Copy-Item -Force $envSrc (Join-Path $app '.env')
+
+# --- ensure pm2 is available (PATH-independent) ---
+$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
+$pm2Exe = $null
+if ($pm2Cmd) {
+  $pm2Exe = $pm2Cmd.Source
+} else {
+  $pm2Candidates = @(
+    (Join-Path $env:APPDATA 'npm\pm2.cmd'),
+    ('C:\Users\' + $env:USERNAME + '\AppData\Roaming\npm\pm2.cmd'),
+    'C:\ProgramData\npm\pm2.cmd',
+    'C:\Program Files\nodejs\pm2.cmd',
+    'C:\Program Files (x86)\nodejs\pm2.cmd'
+  )
+  foreach ($c in $pm2Candidates) { if (Test-Path $c) { $pm2Exe = $c; break } }
+}
+
+if (-not $pm2Exe) {
+  $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  $npmExe = $null
+  if ($npmCmd) {
+    $npmExe = $npmCmd.Source
+  } else {
+    $npmCandidates = @(
+      (Join-Path $env:APPDATA 'npm\npm.cmd'),
+      ('C:\Users\' + $env:USERNAME + '\AppData\Roaming\npm\npm.cmd'),
+      'C:\ProgramData\npm\npm.cmd',
+      'C:\Program Files\nodejs\npm.cmd',
+      'C:\Program Files (x86)\nodejs\npm.cmd'
+    )
+    foreach ($c in $npmCandidates) { if (Test-Path $c) { $npmExe = $c; break } }
+  }
+
+  if (-not $npmExe) {
+    throw "pm2 not found and npm not found on UMPC. Install Node.js (with npm) or preinstall pm2 and ensure PATH is set."
+  }
+
+  & $npmExe i -g pm2
+  $pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
+  if ($pm2Cmd) {
+    $pm2Exe = $pm2Cmd.Source
+  } else {
+    foreach ($c in $pm2Candidates) { if (Test-Path $c) { $pm2Exe = $c; break } }
+  }
+
+  if (-not $pm2Exe) {
+    throw "pm2 installed but executable still not found. Ensure npm global bin is on PATH."
+  }
+}
+
+Set-Location $app
+$env:PORT = $port
+
+# --- stop existing backend process by port (best-effort) ---
+try {
+  $portNum = [int]$port
+  $pids = @()
+
+  try {
+    $conns = Get-NetTCPConnection -State Listen -LocalPort $portNum -ErrorAction SilentlyContinue
+    foreach ($c in ($conns | Where-Object { $_.OwningProcess -and $_.OwningProcess -ne 0 })) {
+      $pids += [int]$c.OwningProcess
+    }
+  } catch { }
+
+  if (-not $pids -or $pids.Count -eq 0) {
+    $lines = & netstat -ano 2>$null
+    foreach ($line in ($lines | Where-Object { $_ })) {
+      $m = [regex]::Match($line, "^(TCP|UDP)\s+\S+:$portNum\s+\S+(?:\s+\S+)?\s+(\d+)\s*$")
+      if ($m.Success) { $pids += [int]$m.Groups[2].Value }
+    }
+  }
+
+  $pids = $pids | Sort-Object -Unique
+  if ($pids -and $pids.Count -gt 0) {
+    Write-Host ("Found existing backend PID(s) on port {0}: {1}" -f $portNum, (($pids -join ', ')))
+    foreach ($pid in $pids) {
+      try {
+        Stop-Process -Id $pid -Force -ErrorAction Stop
+        Write-Host ("Killed PID {0}" -f $pid)
+      } catch {
+        Write-Host ("Failed to kill PID {0}: {1}" -f $pid, $_.Exception.Message)
+      }
+    }
+  } else {
+    Write-Host ("No existing PID found on port {0}" -f $portNum)
+  }
+} catch {
+  Write-Host ("PID kill (by port) skipped due to error: {0}" -f $_.Exception.Message)
+}
+
+try { & $pm2Exe delete $name 2>$null | Out-Null } catch { }
+
+if (Test-Path '.\ecosystem.config.cjs') {
+  & $pm2Exe start ecosystem.config.cjs
+} else {
+  & $pm2Exe start dist\main.js --name $name
+}
+
+& $pm2Exe save
+& $pm2Exe ls --no-color
+'@
 
 try {
-  `$tmp    = '$remoteTmp'
-  `$app    = '$appDir'
-  `$name   = '$appName'
-  `$port   = '$port'
-  `$bundle = Join-Path `$tmp '$artifact'
-  `$envSrc = Join-Path `$tmp '.env'
-
-  if (!(Test-Path `$bundle)) { throw ('bundle missing: ' + `$bundle) }
-  if (!(Test-Path `$envSrc)) { throw ('env missing: ' + `$envSrc) }
-
-  # backup existing env (if present), then overwrite with Jenkins-provided env
-  `$appEnv  = Join-Path `$app '.env'
-  if (Test-Path `$appEnv) {
-    `$bkEnv = Join-Path `$tmp ('.env.backup.' + (Get-Date -Format yyyyMMdd_HHmmss))
-    Copy-Item -Force `$appEnv `$bkEnv
-  }
-
-  if (Test-Path `$app) {
-    `$bk = `$app + '.backup.' + (Get-Date -Format yyyyMMdd_HHmmss)
-    Move-Item -Force `$app `$bk
-  }
-
-  New-Item -ItemType Directory -Force -Path `$app | Out-Null
-  tar -xzf `$bundle -C `$app
-  Copy-Item -Force `$envSrc (Join-Path `$app '.env')
-
-  # --- ensure pm2 is available (PATH-independent) ---
-  `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
-  `$pm2Exe = `$null
-  if (`$pm2Cmd) {
-    `$pm2Exe = `$pm2Cmd.Source
-  } else {
-    `$pm2Candidates = @(
-      (Join-Path `$env:APPDATA 'npm\\pm2.cmd'),
-      ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\pm2.cmd'),
-      'C:\\ProgramData\\npm\\pm2.cmd',
-      'C:\\Program Files\\nodejs\\pm2.cmd',
-      'C:\\Program Files (x86)\\nodejs\\pm2.cmd'
-    )
-    foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
-  }
-
-  if (-not `$pm2Exe) {
-    `$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-    `$npmExe = `$null
-    if (`$npmCmd) {
-      `$npmExe = `$npmCmd.Source
-    } else {
-      `$npmCandidates = @(
-        (Join-Path `$env:APPDATA 'npm\\npm.cmd'),
-        ('C:\\Users\\' + `$env:USERNAME + '\\AppData\\Roaming\\npm\\npm.cmd'),
-        'C:\\ProgramData\\npm\\npm.cmd',
-        'C:\\Program Files\\nodejs\\npm.cmd',
-        'C:\\Program Files (x86)\\nodejs\\npm.cmd'
-      )
-      foreach (`$c in `$npmCandidates) { if (Test-Path `$c) { `$npmExe = `$c; break } }
-    }
-
-    if (-not `$npmExe) {
-      throw "pm2 not found and npm not found on UMPC. Install Node.js (with npm) or preinstall pm2 and ensure PATH is set."
-    }
-
-    & `$npmExe i -g pm2
-    `$pm2Cmd = Get-Command pm2 -ErrorAction SilentlyContinue
-    if (`$pm2Cmd) {
-      `$pm2Exe = `$pm2Cmd.Source
-    } else {
-      foreach (`$c in `$pm2Candidates) { if (Test-Path `$c) { `$pm2Exe = `$c; break } }
-    }
-
-    if (-not `$pm2Exe) {
-      throw "pm2 installed but executable still not found. Ensure npm global bin is on PATH."
-    }
-  }
-
-  Set-Location `$app
-  `$env:PORT = `$port
-
-  # --- stop existing backend process by port (best-effort) ---
-  try {
-    `$portNum = [int]`$port
-    `$pids = @()
-
-    try {
-      # Preferred on modern Windows
-      `$conns = Get-NetTCPConnection -State Listen -LocalPort `$portNum -ErrorAction SilentlyContinue
-      foreach (`$c in (`$conns | Where-Object { `$_.OwningProcess -and `$_.OwningProcess -ne 0 })) {
-        `$pids += [int]`$c.OwningProcess
-      }
-    } catch { }
-
-    if (-not `$pids -or `$pids.Count -eq 0) {
-      # Fallback: netstat parse (avoid locale-specific state strings)
-      `$lines = & netstat -ano 2>`$null
-      foreach (`$line in (`$lines | Where-Object { `$_ })) {
-        `$m = [regex]::Match(`$line, "^(TCP|UDP)\\s+\\S+:`$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
-        if (`$m.Success) { `$pids += [int]`$m.Groups[2].Value }
-      }
-    }
-
-    `$pids = `$pids | Sort-Object -Unique
-    if (`$pids -and `$pids.Count -gt 0) {
-      Write-Host ("Found existing backend PID(s) on port {0}: {1}" -f `$portNum, ((`$pids -join ', ')))
-      foreach (`$pid in `$pids) {
-        try {
-          Stop-Process -Id `$pid -Force -ErrorAction Stop
-          Write-Host ("Killed PID {0}" -f `$pid)
-        } catch {
-          Write-Host ("Failed to kill PID {0}: {1}" -f `$pid, `$_.Exception.Message)
-        }
-      }
-    } else {
-      Write-Host ("No existing PID found on port {0}" -f `$portNum)
-    }
-  } catch {
-    Write-Host ("PID kill (by port) skipped due to error: {0}" -f `$_.Exception.Message)
-  }
-
-  try { & `$pm2Exe delete `$name 2>`$null | Out-Null } catch { }
-
-  if (Test-Path '.\\ecosystem.config.cjs') {
-    & `$pm2Exe start ecosystem.config.cjs
-  } else {
-    & `$pm2Exe start dist\\main.js --name `$name
-  }
-
-  & `$pm2Exe save
-  & `$pm2Exe ls --no-color
+  Invoke-Expression $body
 } catch {
-  `$msg = (`$_ | Out-String)
-  try { `$msg += "`n" + (`$_.ScriptStackTrace | Out-String) } catch { }
-  `$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(`$msg))
-  Write-Output ("REMOTE_ERROR_B64:" + `$b64)
+  $msg = ($_ | Out-String)
+  try { $msg += "`n" + ($_.ScriptStackTrace | Out-String) } catch { }
+  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($msg))
+  Write-Output ("REMOTE_ERROR_B64:" + $b64)
   exit 1
 }
-"@
+'@
+            $deploy = $deploy.Replace('__REMOTE_TMP__', $remoteTmp)
+            $deploy = $deploy.Replace('__APP_DIR__', $appDir)
+            $deploy = $deploy.Replace('__APP_NAME__', $appName)
+            $deploy = $deploy.Replace('__APP_PORT__', $port)
+            $deploy = $deploy.Replace('__ARTIFACT__', $artifact)
             $deployB64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($deploy))
 
             Run-External 'ssh' @(
