@@ -421,19 +421,12 @@ New-Item -ItemType Directory -Force -Path '$appDir'    | Out-Null
 
             # 3) 원격 배포
             # NOTE: wrap the real deploy script in Invoke-Expression so that even parse errors become catchable.
-            $deploy = @'
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-chcp 65001 | Out-Null
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-$OutputEncoding = [Console]::OutputEncoding
-
-$body = @'
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-chcp 65001 | Out-Null
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-$OutputEncoding = [Console]::OutputEncoding
+            $body = @'
+ $ErrorActionPreference = 'Stop'
+ $ProgressPreference = 'SilentlyContinue'
+ chcp 65001 | Out-Null
+ [Console]::OutputEncoding = [Text.Encoding]::UTF8
+ $OutputEncoding = [Console]::OutputEncoding
 
 $tmp    = '__REMOTE_TMP__'
 $app    = '__APP_DIR__'
@@ -530,7 +523,7 @@ try {
   if (-not $pids -or $pids.Count -eq 0) {
     $lines = & netstat -ano 2>$null
     foreach ($line in ($lines | Where-Object { $_ })) {
-      $m = [regex]::Match($line, "^(TCP|UDP)\\s+\\S+:$portNum\\s+\\S+(?:\\s+\\S+)?\\s+(\\d+)\\s*$")
+      $m = [regex]::Match($line, "^(TCP|UDP)\s+\S+:$portNum\s+\S+(?:\s+\S+)?\s+(\d+)\s*$")
       if ($m.Success) { $pids += [int]$m.Groups[2].Value }
     }
   }
@@ -561,11 +554,28 @@ if (Test-Path './ecosystem.config.cjs') {
   & $pm2Exe start dist/main.js --name $name
 }
 
-& $pm2Exe save
-& $pm2Exe ls --no-color
+ & $pm2Exe save
+ & $pm2Exe ls --no-color
 '@
 
+            $body = $body.Replace('__REMOTE_TMP__', $remoteTmp)
+            $body = $body.Replace('__APP_DIR__', $appDir)
+            $body = $body.Replace('__APP_NAME__', $appName)
+            $body = $body.Replace('__APP_PORT__', $port)
+            $body = $body.Replace('__ARTIFACT__', $artifact)
+
+            $bodyB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body))
+
+            $deploy = @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+chcp 65001 | Out-Null
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$OutputEncoding = [Console]::OutputEncoding
+
 try {
+  $bodyB64 = '__BODY_B64__'
+  $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($bodyB64))
   Invoke-Expression $body
 } catch {
   $msg = ($_ | Out-String)
@@ -575,11 +585,8 @@ try {
   exit 1
 }
 '@
-            $deploy = $deploy.Replace('__REMOTE_TMP__', $remoteTmp)
-            $deploy = $deploy.Replace('__APP_DIR__', $appDir)
-            $deploy = $deploy.Replace('__APP_NAME__', $appName)
-            $deploy = $deploy.Replace('__APP_PORT__', $port)
-            $deploy = $deploy.Replace('__ARTIFACT__', $artifact)
+
+            $deploy = $deploy.Replace('__BODY_B64__', $bodyB64)
             $deployB64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($deploy))
 
             Run-External 'ssh' @(
