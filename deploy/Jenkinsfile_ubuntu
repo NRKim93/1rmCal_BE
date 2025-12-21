@@ -20,7 +20,6 @@ pipeline {
 
     // UMPC target
     UMPC_HOST     = '172.30.1.24'
-    REMOTE_TMP    = '/tmp/onerm-backend'
     UMPC_APP_NAME = 'onerm-backend'
     APP_PORT      = '3001'
     SMOKE_PATH    = '/'
@@ -131,6 +130,7 @@ EOF
             chmod 600 "$SSH_KEY"
 
             DEST="${SSH_USER}@${UMPC_HOST}"
+            REMOTE_TMP="/home/${SSH_USER}/tmp/onerm-backend"
             REMOTE_TGZ="${REMOTE_TMP}/${ARTIFACT_NAME}"
             REMOTE_ENV="${REMOTE_TMP}/.env"
             APP_DIR="/home/${SSH_USER}/apps/${UMPC_APP_NAME}"
