@@ -200,6 +200,12 @@ if [ ! -f "$env_src" ]; then
   exit 1
 fi
 
+env_cache=""
+if [ -d "$app_dir" ] && [ "$env_src" = "${app_dir}/.env" ] && [ -f "$env_src" ]; then
+  env_cache="/tmp/${app_name}.env.$$"
+  cp -f "$env_src" "$env_cache"
+fi
+
 if [ -d "$app_dir" ]; then
   backup="${app_dir}.backup.$(date +%Y%m%d_%H%M%S)"
   mv "$app_dir" "$backup"
@@ -207,7 +213,12 @@ fi
 
 mkdir -p "$app_dir"
 tar -xzf "$bundle" -C "$app_dir"
-cp -f "$env_src" "${app_dir}/.env"
+if [ -n "$env_cache" ]; then
+  cp -f "$env_cache" "${app_dir}/.env"
+  rm -f "$env_cache"
+else
+  cp -f "$env_src" "${app_dir}/.env"
+fi
 
 cd "$app_dir"
 export PORT="$app_port"
