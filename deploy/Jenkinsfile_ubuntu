@@ -130,7 +130,8 @@ EOF
             chmod 600 "$SSH_KEY"
 
             DEST="${SSH_USER}@${UMPC_HOST}"
-            REMOTE_TMP="/tmp/onerm-backend"
+            REMOTE_TMP_BASE="/home/${SSH_USER}/tmp"
+            REMOTE_TMP="${REMOTE_TMP_BASE}/onerm-backend"
             REMOTE_TGZ="${REMOTE_TMP}/${ARTIFACT_NAME}"
             REMOTE_ENV="${REMOTE_TMP}/.env"
             APP_DIR="/home/${SSH_USER}/apps/${UMPC_APP_NAME}"
@@ -145,7 +146,7 @@ EOF
               -o LogLevel=ERROR \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              "$DEST" "mkdir -p '${REMOTE_TMP}' '${APP_DIR}'"
+              "$DEST" "umask 077 && mkdir -p '${REMOTE_TMP_BASE}' '${REMOTE_TMP}' '${APP_DIR}' && chmod 700 '${REMOTE_TMP}'"
 
             scp -i "$SSH_KEY" \
               -o IdentitiesOnly=yes \
