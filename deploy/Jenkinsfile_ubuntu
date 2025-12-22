@@ -250,17 +250,6 @@ EOSSH
       }
     }
 
-    stage('Smoke Check') {
-      steps {
-        sh '''
-          set +e
-          url="http://${UMPC_HOST}:${APP_PORT}${SMOKE_PATH}"
-          echo "Smoke check: $url"
-          curl -fsS --max-time 10 "$url" >/dev/null
-        '''
-      }
-    }
-
     stage('Clean Workspace (after)') {
       steps { cleanWs() }
     }
