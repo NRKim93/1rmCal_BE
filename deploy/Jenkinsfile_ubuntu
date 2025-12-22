@@ -130,10 +130,8 @@ EOF
             chmod 600 "$SSH_KEY"
 
             DEST="${SSH_USER}@${UMPC_HOST}"
-            REMOTE_TMP_BASE="/home/${SSH_USER}/tmp"
-            REMOTE_TMP="${REMOTE_TMP_BASE}/onerm-backend"
-            REMOTE_TGZ="${REMOTE_TMP}/${ARTIFACT_NAME}"
-            REMOTE_ENV="${REMOTE_TMP}/.env"
+            REMOTE_TGZ="/home/${SSH_USER}/${ARTIFACT_NAME}"
+            REMOTE_ENV="/home/${SSH_USER}/.onerm-backend.env"
             APP_DIR="/home/${SSH_USER}/apps/${UMPC_APP_NAME}"
 
             ssh -i "$SSH_KEY" \
@@ -146,7 +144,7 @@ EOF
               -o LogLevel=ERROR \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              "$DEST" "umask 077 && mkdir -p '${REMOTE_TMP_BASE}' '${REMOTE_TMP}' '${APP_DIR}' && chmod 700 '${REMOTE_TMP}'"
+              "$DEST" "mkdir -p '${APP_DIR}'"
 
             scp -i "$SSH_KEY" \
               -o IdentitiesOnly=yes \
@@ -184,17 +182,15 @@ EOF
               -o LogLevel=ERROR \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              "$DEST" "bash -s" -- "${REMOTE_TMP}" "${APP_DIR}" "${UMPC_APP_NAME}" "${APP_PORT}" "${ARTIFACT_NAME}" <<'EOSSH'
+              "$DEST" "bash -s" -- "${REMOTE_TGZ}" "${REMOTE_ENV}" "${APP_DIR}" "${UMPC_APP_NAME}" "${APP_PORT}" <<'EOSSH'
 set -euo pipefail
 
-remote_tmp="$1"
-app_dir="$2"
-app_name="$3"
-app_port="$4"
-artifact="$5"
+bundle="$1"
+env_src="$2"
+app_dir="$3"
+app_name="$4"
+app_port="$5"
 
-bundle="${remote_tmp}/${artifact}"
-env_src="${remote_tmp}/.env"
 if [ ! -f "$bundle" ]; then
   echo "bundle missing: $bundle"
   exit 1
