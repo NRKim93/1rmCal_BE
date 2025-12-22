@@ -11,7 +11,7 @@ interface OnermCalculatingResult {
   repsTable: Array<{ reps: number; weight: number }>;
 }
 
-@Controller('onerm')
+@Controller('/api/v1/onerm')
 export class OnermController {
   constructor(private readonly service: OnermService) {}
 
