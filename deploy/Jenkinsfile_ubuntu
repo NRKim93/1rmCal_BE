@@ -130,7 +130,7 @@ EOF
             chmod 600 "$SSH_KEY"
 
             DEST="${SSH_USER}@${UMPC_HOST}"
-            REMOTE_TMP="/home/${SSH_USER}/tmp/onerm-backend"
+            REMOTE_TMP="/tmp/onerm-backend"
             REMOTE_TGZ="${REMOTE_TMP}/${ARTIFACT_NAME}"
             REMOTE_ENV="${REMOTE_TMP}/.env"
             APP_DIR="/home/${SSH_USER}/apps/${UMPC_APP_NAME}"
@@ -235,12 +235,14 @@ elif command -v fuser >/dev/null 2>&1; then
   fuser -k -n tcp "$app_port" || true
 fi
 
-pm2 delete "$app_name" >/dev/null 2>&1 || true
-
 if [ -f ecosystem.config.cjs ]; then
-  pm2 start ecosystem.config.cjs
+  pm2 startOrRestart ecosystem.config.cjs --update-env
 else
-  pm2 start dist/main.js --name "$app_name"
+  if pm2 describe "$app_name" >/dev/null 2>&1; then
+    pm2 restart "$app_name" --update-env
+  else
+    pm2 start dist/main.js --name "$app_name"
+  fi
 fi
 
 pm2 save
