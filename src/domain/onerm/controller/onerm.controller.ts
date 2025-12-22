@@ -1,5 +1,6 @@
 import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
 import { OnermService } from '../service/onerm.service';
+import { Public } from 'src/common/security/public.decorator';
 
 interface CalculateRequest {
   weight: number;
@@ -15,6 +16,7 @@ interface OnermCalculatingResult {
 export class OnermController {
   constructor(private readonly service: OnermService) {}
 
+  @Public()
   @Post('/cal')
   calculate(@Body() request: CalculateRequest): OnermCalculatingResult {
     const { weight, reps } = request;
