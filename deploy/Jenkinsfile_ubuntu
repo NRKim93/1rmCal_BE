@@ -131,8 +131,8 @@ EOF
 
             DEST="${SSH_USER}@${UMPC_HOST}"
             REMOTE_TGZ="/home/${SSH_USER}/${ARTIFACT_NAME}"
-            REMOTE_ENV="/home/${SSH_USER}/.onerm-backend.env"
             APP_DIR="/home/${SSH_USER}/apps/${UMPC_APP_NAME}"
+            REMOTE_ENV="${APP_DIR}/.env"
 
             ssh -i "$SSH_KEY" \
               -o IdentitiesOnly=yes \
