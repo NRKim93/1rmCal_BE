@@ -52,6 +52,7 @@ export class OauthService {
     if (!nowUser && dto.mode === "signup") {
       const id = await this.idUtil.idGenerate("users");
       const newUser = await this.userRepository.createNewUser(id, naverUser, "NAVER");
+      console.log(newUser.email);
 
       return {email : newUser.email, code : HttpStatusCode.Created};
     }

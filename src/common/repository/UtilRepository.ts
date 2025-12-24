@@ -1,3 +1,4 @@
+import { ErrorCode } from "../exception/error-code.enum";
 import {PrismaService} from "../service/PrismaService";
 import {Injectable} from "@nestjs/common";
 
@@ -6,7 +7,7 @@ export class UtilRepository {
     constructor( private readonly prisma :PrismaService) {}
 
     async idGenerate(key: string): Promise<number> {
-        const idValue = await this.prisma.idtables.findFirstOrThrow({
+        const idValue = await this.prisma.idtables.findFirst({
             select:{
                 id_val:true
             },
@@ -14,6 +15,10 @@ export class UtilRepository {
                 id_key: key
             }
         });
+
+        if (!idValue) {
+            throw ErrorCode.DATABASE_ERROR;
+        }
 
         return idValue.id_val;
     }

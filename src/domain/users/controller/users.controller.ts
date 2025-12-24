@@ -7,6 +7,7 @@ import {NaverTokenRequestDto} from "../dto/naver-token-request.dto";
 import {UserJoinRequestDto} from "../dto/user-join-request.dto";
 import {HttpStatusCode} from "axios";
 import {Response} from "express";
+import { NaverTokenResponseDto } from '../dto/naver-token-response.dto';
 
 @ApiTags('Users')
 @Controller('/api/v1/users')

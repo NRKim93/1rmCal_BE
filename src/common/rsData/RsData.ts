@@ -20,6 +20,5 @@ export async function checked(code:HttpStatusCode,flg : boolean) : Promise<RsDat
 
 //  HTTP_STATUS_CODE : 201일 경우
 export async function created(dto :NaverTokenResponseDto) : Promise<RsData> {
-    const email : string = dto.email;
-    return new RsData(dto.code, "OK");
+    return new RsData(dto, "OK");
 }

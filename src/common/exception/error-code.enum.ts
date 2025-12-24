@@ -140,6 +140,11 @@ export const ErrorCode = {
     JWT_PUBLIC_KEY_FAILED: new ErrorResponse(
         HttpStatus.INTERNAL_SERVER_ERROR,
         '환경변수 미설정 (JWT_PUBLIC_KEY)'
+    ),
+
+    DB_ERROR: new ErrorResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Internal error'
     )
 
 } as const;
