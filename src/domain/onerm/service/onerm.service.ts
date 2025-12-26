@@ -1,21 +1,17 @@
 import { Injectable } from '@nestjs/common';
-
-interface OnermCalculatingResult {
-  oneRm: number;
-  repsTable: Array<{ reps: number; weight: number }>;
-}
+import { onermRequestDto, onermResponseDto } from '../dto/onerm-calculating.dto';
 
 @Injectable()
 export class OnermService {
-  calculating(weight: number, reps: number): OnermCalculatingResult {
+  calculating(request : onermRequestDto): onermResponseDto {
     let oneRm: number;
 
     // 1회 반복인 경우 1RM은 입력 무게와 같습니다.
-    if (reps === 1) {
-      oneRm = weight;
+    if (request.reps === 1) {
+      oneRm = request.weight;
     } else {
       // 2회 이상 반복인 경우 Epley 공식으로 1RM 계산
-      oneRm = Math.round(weight * (1 + reps / 30));
+      oneRm = Math.round(request.weight * (1 + request.reps / 30));
     }
 
     const repsTable: Array<{ reps: number; weight: number }> = [];
@@ -32,16 +28,14 @@ export class OnermService {
     }
 
     // 입력된 reps와 weight를 테이블에 포함
-    const inputWeightIndex = repsTable.findIndex(item => item.reps === reps);
+    const inputWeightIndex = repsTable.findIndex(item => item.reps === request.reps);
     if (inputWeightIndex !== -1) {
-        repsTable[inputWeightIndex].weight = weight;
-    } else if (reps >= 1 && reps <= 20) { // 입력된 reps가 1~20 사이인데 테이블에 없을 경우 (발생 가능성은 낮음)
-         // 적절히 처리 (예: 테이블에 추가하거나 로깅)
+        repsTable[inputWeightIndex].weight = request.weight;
     }
 
     return {
       oneRm: oneRm,
-      repsTable: repsTable,
+      repsTable: repsTable
     };
   }
 }
