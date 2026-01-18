@@ -74,7 +74,6 @@ export class JwtService {
 
     //  RefreshToken 생성
     async generateRefreshToken(res:Response,userId:string): Promise<string> {
-        console.log(2);
         const exp = Number(process.env["REFRESH_EXPIRE_TIME"]);
         const token = await this.signToken(exp,userId,{typ:'refresh'});
         const cookieExp = Number(process.env["COOKIE_EXPIRE_TIME"]);
@@ -107,7 +106,6 @@ export class JwtService {
 
     //  refreshToken 검증
     async verifyRefreshToken(refreshToken: string): Promise<any> {
-        console.log(1);
 
         const publicKey = this.getPublicKey();
 

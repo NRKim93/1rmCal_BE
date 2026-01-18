@@ -25,8 +25,6 @@ export class AuthController {
 
         const state = await this.auth.verifyAccess(res,access,refresh);
 
-        console.log(state);
-
         //  accessToken이 유효하지 않은 경우
         if(!state) {
             return checked(HttpStatusCode.Unauthorized, false);
