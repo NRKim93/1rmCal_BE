@@ -102,6 +102,19 @@ export class TrainingRepository {
 
   // 모든 운동 카테고리 조회
   async getAllTrainingCategories() {
-    return await this.prisma.training_category.findMany();
+    const result =  await this.prisma.training_category.findMany({
+      where: {
+        training_name: {
+          in: ['BENCHPRESS', 'SQUAT', 'DEADLIFT']
+        }
+      }
+    });
+
+    return result.map(result => ({
+        seq: result.seq,
+        trainingName: result.training_name,
+        trainingDisplayName: result.training_display_name
+      })
+    );
   }
 }

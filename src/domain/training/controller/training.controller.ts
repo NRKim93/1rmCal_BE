@@ -10,12 +10,20 @@ export class TrainingController {
     ) {
     }
 
-    @Get(`/getLatestHistory`)
+    @Get('/getLatestHistory')
     async getLatestHistory(@Query('seq') seq: number) {
         const lastHistory = await this.trainingService.getLatestHistory(seq);
 
-        console.log(lastHistory);
-
         return await success(lastHistory);
+    }
+
+    @Get('/getAllTrainingCategories')
+    async getAllTrainingCategories() {
+        const trainingCategories = await this.trainingService.getAllTrainingCategories(); 
+
+        console.log(trainingCategories)
+
+        return await success(trainingCategories);
+
     }
 }

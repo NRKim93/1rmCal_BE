@@ -48,6 +48,7 @@ model oauths {
 model training_category {
   seq             Int    @id @default(autoincrement())
   training_name   String @db.VarChar(100)
+  training_display_name   String @db.VarChar(100)
   training_type   String @db.VarChar(100)
   target_category String @db.VarChar(100)
   target_muscle   String @db.VarChar(100)
@@ -76,7 +77,8 @@ model onerm {
   author        String   @db.VarChar(100)
   training_name String   @db.VarChar(100)
   weight        Decimal  @db.Decimal(5, 2)
-  createdAt     DateTime @db.DateTime()
+  unit String @db.VarChar(10)
+  createdAt     DateTime @db.Timestamp(0) @default(now())
 }
 
 model training {

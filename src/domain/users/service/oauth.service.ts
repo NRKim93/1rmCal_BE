@@ -8,7 +8,6 @@ import { OauthTokenService } from 'src/common/service/OauthTokenService';
 import {UserRepository} from "../repository/user.repository";
 import {IdGenerate} from "../../../common/utils/id.generate";
 import {JwtService} from "../../../common/security/jwt/jwt.service";
-import {CookieUtil} from "../../../common/utils/cookie.util";
 import {Response} from "express";
 
 @Injectable()
@@ -41,7 +40,7 @@ export class OauthService {
 
     const accessToken = tokenResponse.access_token;
 
-    const profileResponse = await  this.oauthTokenService.getUserInfo(naverProfileUrl,accessToken);
+    const profileResponse = await this.oauthTokenService.getUserInfo(naverProfileUrl,accessToken);
     
     const naverUser = profileResponse.data.response;
 
@@ -54,12 +53,12 @@ export class OauthService {
       const newUser = await this.userRepository.createNewUser(id, naverUser, "NAVER");
       console.log(newUser.email);
 
-      return {email : newUser.email, code : HttpStatusCode.Created};
+      return {email : newUser.email, isLoggedIn : false, code : HttpStatusCode.Created};
     }
 
     if(!nowUser && dto.mode ==="login") {
       //  로그인 버튼 통해서 왔지만 회원이 아닌경우
-      return {email : naverUser.email, code : HttpStatusCode.Created};
+      return {email : naverUser.email, isLoggedIn : false, code : HttpStatusCode.Created};
     }
       const cookieExpire = this.configService.get('COOKIE_EXPIRE_TIME');
       const domain = this.configService.get('COOKIE_DOMAIN');
@@ -72,6 +71,6 @@ export class OauthService {
 
       console.log(nowUser);
 
-      return {email:nowUser.users.email , seq: nowUser.users.seq ,code : HttpStatusCode.Ok};
+      return {email:nowUser.users.email , seq: nowUser.users.seq , isLoggedIn : true, code : HttpStatusCode.Ok};
     }
 }

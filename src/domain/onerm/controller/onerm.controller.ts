@@ -1,8 +1,8 @@
-import { Controller, Post, Body, BadRequestException, Query } from '@nestjs/common';
+import { Controller, Post, Body, Query } from '@nestjs/common';
 import { OnermService } from '../service/onerm.service';
 import { Public } from 'src/common/security/public.decorator';
 import { ApiOperation } from '@nestjs/swagger';
-import { onermRequestDto } from '../dto/onerm-calculating.dto';
+import { onermRequestDto, OnermSaveDto } from '../dto/onerm.dto';
 import { success } from 'src/common/rsData/RsData';
 
 
@@ -18,4 +18,14 @@ export class OnermController {
 
     return success(calResult);
   }
+
+  @Post()
+  @ApiOperation({summary: '1rm 기록 저장용 컨트롤러 '})
+  async saveOnerm(@Body() request: OnermSaveDto) {
+    const saveResult = this.service.save(request); 
+    
+    return success(saveResult); 
+  }
+
+  
 }

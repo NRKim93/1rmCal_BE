@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { onermRequestDto, onermResponseDto } from '../dto/onerm-calculating.dto';
+import { onermRequestDto, onermResponseDto, OnermSaveDto } from '../dto/onerm.dto';
+import { OnermRepository } from '../repository/onerm.repository';
 
 @Injectable()
 export class OnermService {
+  constructor(
+    private readonly onermRepository: OnermRepository
+  ) {}
+
   calculating(request : onermRequestDto): onermResponseDto {
     let oneRm: number;
 
@@ -37,5 +42,9 @@ export class OnermService {
       oneRm: oneRm,
       repsTable: repsTable
     };
+  }
+
+  async save(request: OnermSaveDto) {
+    return this.onermRepository.save(request);
   }
 }
