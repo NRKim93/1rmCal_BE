@@ -30,8 +30,6 @@ export class AuthService {
                     //  refreshToken 체크 후 accessToken 갱신
                     const refresh= await this.jwt.verifyRefreshToken(refreshToken);
 
-                    console.log(refresh);
-
                     const userId = String(refresh.payload.sub)
 
                     const now = Math.floor(Date.now() / 1000);

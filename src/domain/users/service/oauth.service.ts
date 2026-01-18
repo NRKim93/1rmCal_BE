@@ -51,7 +51,6 @@ export class OauthService {
     if (!nowUser && dto.mode === "signup") {
       const id = await this.idUtil.idGenerate("users");
       const newUser = await this.userRepository.createNewUser(id, naverUser, "NAVER");
-      console.log(newUser.email);
 
       return {email : newUser.email, isLoggedIn : false, code : HttpStatusCode.Created};
     }
@@ -68,8 +67,6 @@ export class OauthService {
 
       await this.jwtService.generateAccessToken(res,nowUser.identify);
       await this.jwtService.generateRefreshToken(res,nowUser.identify);
-
-      console.log(nowUser);
 
       return {email:nowUser.users.email , seq: nowUser.users.seq , isLoggedIn : true, code : HttpStatusCode.Ok};
     }

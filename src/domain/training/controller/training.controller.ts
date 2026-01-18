@@ -21,8 +21,6 @@ export class TrainingController {
     async getAllTrainingCategories() {
         const trainingCategories = await this.trainingService.getAllTrainingCategories(); 
 
-        console.log(trainingCategories)
-
         return await success(trainingCategories);
 
     }
