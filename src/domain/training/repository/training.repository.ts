@@ -100,7 +100,7 @@ export class TrainingRepository {
     });
   }
 
-  // 모든 운동 카테고리 조회
+  // 모든 운동 카테고리 조회 (1RM 측정용)
   async getAllTrainingCategories() {
     const result =  await this.prisma.training_category.findMany({
       where: {
@@ -116,5 +116,22 @@ export class TrainingRepository {
         trainingDisplayName: result.training_display_name
       })
     );
+  }
+
+  async getAutoComplete() {
+    const result = await this.prisma.training_category.findMany({
+      select: {
+        seq: true,
+        training_name: true,
+        training_display_name: true
+      },
+      orderBy: {training_display_name: "asc"}
+    })
+
+    return result.map(result => ({
+      seq: result.seq,
+      trainingName: result.training_name,
+      trainingDisplayName: result.training_display_name
+    }))
   }
 }

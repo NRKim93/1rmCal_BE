@@ -24,4 +24,11 @@ export class TrainingController {
         return await success(trainingCategories);
 
     }
+
+    @Get('/getAutoComplete')
+    async getAutoComplete() {
+        const result = await this.trainingService.getAutoComplete();
+
+        return await success(result);
+    }
 }

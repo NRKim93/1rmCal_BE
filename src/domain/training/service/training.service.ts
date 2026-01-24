@@ -16,4 +16,8 @@ export class TrainingService {
     async getAllTrainingCategories(): Promise<TrainingCategories[]> {
         return await this.trainingRepo.getAllTrainingCategories(); 
     }
+
+    async getAutoComplete(): Promise<TrainingCategories[]> {
+        return await this.trainingRepo.getAutoComplete(); 
+    }
 }
