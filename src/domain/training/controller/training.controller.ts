@@ -1,6 +1,7 @@
-import {Controller, Get, ParseIntPipe, Query} from '@nestjs/common';
+import {Body, Controller, Get, Post, Query} from '@nestjs/common';
 import {TrainingService} from "../service/training.service";
 import {success} from "../../../common/rsData/RsData";
+import {CreateTrainingRequestDto} from "../dto/training.dto";
 
 
 @Controller('/api/v1/training')
@@ -28,6 +29,13 @@ export class TrainingController {
     @Get('/getAutoComplete')
     async getAutoComplete() {
         const result = await this.trainingService.getAutoComplete();
+
+        return await success(result);
+    }
+
+    @Post('/create')
+    async createTraining(@Body() param: CreateTrainingRequestDto) {
+        const result = await this.trainingService.createTraining(param);
 
         return await success(result);
     }

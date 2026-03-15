@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {TrainingRepository} from "../repository/training.repository";
 import { TrainingCategories } from '../dto/trainingCategories.dto';
+import { CreateTrainingRequestDto } from '../dto/training.dto';
 
 @Injectable()
 export class TrainingService {
@@ -19,5 +20,9 @@ export class TrainingService {
 
     async getAutoComplete(): Promise<TrainingCategories[]> {
         return await this.trainingRepo.getAutoComplete(); 
+    }
+
+    async createTraining(param: CreateTrainingRequestDto) {
+        return await this.trainingRepo.createTraining(param); 
     }
 }
