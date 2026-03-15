@@ -85,7 +85,7 @@ model training {
   seq              Int                @id @default(autoincrement())
   user_seq         Int
   users            users              @relation(fields: [user_seq], references: [seq])
-  training_date    DateTime           @default(now()) @db.Timestamp(0)
+  training_date    DateTime           @default(now()) @db.DateTime(0)
   training_history training_history[]
 }
 
