@@ -23,6 +23,6 @@ import { TrainingModule } from './domain/training/training.module';
     TrainingModule
   ],
   providers: [RedisService, TrainingService],
-  controllers: [TrainingController, TrainingController],
+  controllers: [TrainingController],
 })
 export class AppModule {}

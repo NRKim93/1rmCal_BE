@@ -1,9 +1,9 @@
 import { Controller, Post, Body, Query } from '@nestjs/common';
 import { OnermService } from '../service/onerm.service';
-import { Public } from 'src/common/security/public.decorator';
+import { Public } from '../../../common/security/public.decorator';
 import { ApiOperation } from '@nestjs/swagger';
 import { onermRequestDto, OnermSaveDto } from '../dto/onerm.dto';
-import { success } from 'src/common/rsData/RsData';
+import { success } from '../../../common/rsData/RsData';
 
 
 @Controller('/api/v1/onerm')

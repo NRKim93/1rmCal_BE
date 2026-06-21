@@ -4,7 +4,7 @@ import {HttpStatusCode} from "axios";
 import {NaverTokenRequestDto} from "../dto/naver-token-request.dto";
 import {NaverTokenResponseDto} from "../dto/naver-token-response.dto";
 import {OauthRepository} from "../repository/oauth.repository";
-import { OauthTokenService } from 'src/common/service/OauthTokenService';
+import { OauthTokenService } from '../../../common/service/OauthTokenService';
 import {UserRepository} from "../repository/user.repository";
 import {IdGenerate} from "../../../common/utils/id.generate";
 import {JwtService} from "../../../common/security/jwt/jwt.service";

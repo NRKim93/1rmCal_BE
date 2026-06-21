@@ -1,5 +1,5 @@
 import {HttpStatusCode} from "axios";
-import { NaverTokenResponseDto } from "src/domain/users/dto/naver-token-response.dto";
+import { NaverTokenResponseDto } from "../../domain/users/dto/naver-token-response.dto";
 
 export class RsData {
     constructor(
