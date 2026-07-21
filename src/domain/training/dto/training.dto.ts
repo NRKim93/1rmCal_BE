@@ -1,5 +1,6 @@
 import { Type } from "class-transformer";
-import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
+import { training_mode } from "@prisma/client";
+import { IsArray, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 
 export class TrainingDto {
     id: number;
@@ -18,6 +19,12 @@ export class CreateTrainingItemDto {
     @IsOptional()
     @IsNumber()
     trainingSeq?: number;
+
+    @Type(() => Number)
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    trainingCategorySeq?: number;
 
     @Type(() => Number)
     @IsNumber()
@@ -46,9 +53,31 @@ export class CreateTrainingItemDto {
     @Type(() => String)
     @IsString()
     rest: string;
+
+    @Type(() => Number)
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    restSeconds?: number;
 }
 
 export class CreateTrainingRequestDto {
+    @IsOptional()
+    @IsEnum(training_mode)
+    mode?: training_mode;
+
+    @Type(() => Number)
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    userProgramSeq?: number;
+
+    @Type(() => Number)
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    programDaySeq?: number;
+
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateTrainingItemDto)

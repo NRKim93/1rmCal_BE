@@ -1,13 +1,50 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { success } from '../../../common/rsData/RsData';
 import { CreateTrainingProgramRequestDto } from '../dto/create-training-program.dto';
+import { StartTrainingProgramRequestDto } from '../dto/start-training-program.dto';
 import { TrainingProgramService } from '../service/training-program.service';
 
 @ApiTags('training-programs')
 @Controller('/api/v1/training-programs')
 export class TrainingProgramController {
   constructor(private readonly service: TrainingProgramService) {}
+
+  @Get('active')
+  @ApiOperation({ summary: '활성 트레이닝 프로그램 목록 조회' })
+  async findActive(@Query('userSeq') userSeq?: string) {
+    const parsedUserSeq = userSeq === undefined ? undefined : Number(userSeq);
+    if (
+      parsedUserSeq !== undefined &&
+      (!Number.isInteger(parsedUserSeq) || parsedUserSeq < 1)
+    ) {
+      throw new BadRequestException('userSeq must be a positive integer');
+    }
+    const programs = await this.service.findActive(parsedUserSeq);
+    return success(programs);
+  }
+
+  @Post(':programSeq/start')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: '사용자 트레이닝 프로그램 시작 또는 재개' })
+  async start(
+    @Param('programSeq', ParseIntPipe) programSeq: number,
+    @Body() request: StartTrainingProgramRequestDto,
+  ) {
+    const session = await this.service.start(programSeq, request.userSeq);
+    return success(session);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)

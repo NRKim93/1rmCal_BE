@@ -29,6 +29,16 @@ export class CreateTrainingProgramExerciseDto {
   @Min(1)
   trainingCategorySeq!: number;
 
+  @ApiPropertyOptional({
+    description: '목표 중량 계산에 사용할 기준 1RM 운동 종목 PK',
+    example: 1,
+  })
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  oneRmReferenceCategorySeq?: number;
+
   @ApiProperty({ description: '회차 내 운동 순서', example: 1 })
   @Type(() => Number)
   @IsInt()
@@ -76,12 +86,6 @@ export class CreateTrainingProgramExerciseDto {
 }
 
 export class CreateTrainingProgramDayDto {
-  @ApiProperty({ description: '1부터 시작하는 주차 순번', example: 1 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  weekOrder!: number;
-
   @ApiProperty({ description: '주차 내 1부터 시작하는 일차 순번', example: 1 })
   @Type(() => Number)
   @IsInt()
@@ -101,6 +105,22 @@ export class CreateTrainingProgramDayDto {
   @ValidateNested({ each: true })
   @Type(() => CreateTrainingProgramExerciseDto)
   exercises!: CreateTrainingProgramExerciseDto[];
+}
+
+export class CreateTrainingProgramWeekDto {
+  @ApiProperty({ description: '1부터 시작하는 주차 순번', example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  weekOrder!: number;
+
+  @ApiProperty({ type: [CreateTrainingProgramDayDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => CreateTrainingProgramDayDto)
+  days!: CreateTrainingProgramDayDto[];
 }
 
 export class CreateTrainingProgramRequestDto {
@@ -142,11 +162,11 @@ export class CreateTrainingProgramRequestDto {
   @IsBoolean()
   isActive = true;
 
-  @ApiProperty({ type: [CreateTrainingProgramDayDto] })
+  @ApiProperty({ type: [CreateTrainingProgramWeekDto] })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(365)
+  @ArrayMaxSize(52)
   @ValidateNested({ each: true })
-  @Type(() => CreateTrainingProgramDayDto)
-  days!: CreateTrainingProgramDayDto[];
+  @Type(() => CreateTrainingProgramWeekDto)
+  weeks!: CreateTrainingProgramWeekDto[];
 }

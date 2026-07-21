@@ -201,20 +201,24 @@ GET  /api/v1/training-sessions/history
   "description": "전신 근력 향상을 위한 프로그램",
   "version": 1,
   "isActive": true,
-  "days": [
+  "weeks": [
     {
       "weekOrder": 1,
-      "dayOrder": 1,
-      "name": "1주차 A",
-      "exercises": [
+      "days": [
         {
-          "trainingCategorySeq": 1,
-          "exerciseOrder": 1,
-          "targetSets": 5,
-          "targetRepsMin": 5,
-          "targetRepsMax": 5,
-          "restSeconds": 180,
-          "targetWeightRate": 75
+          "dayOrder": 1,
+          "name": "Workout A",
+          "exercises": [
+            {
+              "trainingCategorySeq": 1,
+              "exerciseOrder": 1,
+              "targetSets": 5,
+              "targetRepsMin": 5,
+              "targetRepsMax": 5,
+              "restSeconds": 180,
+              "targetWeightRate": 75
+            }
+          ]
         }
       ]
     }
@@ -226,7 +230,8 @@ GET  /api/v1/training-sessions/history
 
 - `code`는 영문 대문자, 숫자, 밑줄만 허용하며 요청 시 대문자로 정규화한다.
 - `version`, 모든 순번, 목표 세트 및 반복 수는 1 이상이다.
-- 동일 프로그램 안에서 `(weekOrder, dayOrder)`는 중복될 수 없다.
+- 동일 프로그램 안에서 `weekOrder`는 중복될 수 없다.
+- 동일 주차 안에서 `dayOrder`는 중복될 수 없다.
 - 동일 회차 안에서 `exerciseOrder`와 `trainingCategorySeq`는 중복될 수 없다.
 - `targetRepsMin`은 `targetRepsMax`보다 클 수 없다.
 - `targetWeightRate`는 0~100 사이의 1RM 대비 백분율이다.

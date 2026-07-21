@@ -15,7 +15,9 @@ export class OnermRepository {
                 author: request.author,
                 training_name: request.trainingName,
                 weight: request.weight,
-                unit: request.unit
+                unit: request.unit,
+                source_weight: request.sourceWeight,
+                source_reps: request.sourceReps,
             }
         });
     }

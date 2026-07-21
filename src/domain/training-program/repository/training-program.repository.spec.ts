@@ -17,18 +17,22 @@ function createRequest(): CreateTrainingProgramRequestDto {
     name: '스트롱리프트 5x5',
     version: 1,
     isActive: true,
-    days: [
+    weeks: [
       {
         weekOrder: 1,
-        dayOrder: 1,
-        name: '1주차 A',
-        exercises: [
+        days: [
           {
-            trainingCategorySeq: 10,
-            exerciseOrder: 1,
-            targetSets: 5,
-            targetRepsMin: 5,
-            targetRepsMax: 5,
+            dayOrder: 1,
+            name: 'Workout A',
+            exercises: [
+              {
+                trainingCategorySeq: 10,
+                exerciseOrder: 1,
+                targetSets: 5,
+                targetRepsMin: 5,
+                targetRepsMax: 5,
+              },
+            ],
           },
         ],
       },
@@ -50,6 +54,9 @@ describe('TrainingProgramRepository', () => {
     $transaction: jest.fn((callback: (client: typeof tx) => Promise<unknown>) =>
       callback(tx),
     ),
+    training_program: {
+      findMany: jest.fn(),
+    },
   };
   const repository = new TrainingProgramRepository(
     prisma as unknown as PrismaService,
@@ -76,6 +83,18 @@ describe('TrainingProgramRepository', () => {
         version: request.version,
       },
     });
+  });
+
+  it('returns active programs with ordered days and exercises', async () => {
+    prisma.training_program.findMany.mockResolvedValue([]);
+
+    await expect(repository.findActive()).resolves.toEqual([]);
+    expect(prisma.training_program.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { is_active: true },
+        orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
+      }),
+    );
   });
 
   it('rejects an existing code and version', async () => {

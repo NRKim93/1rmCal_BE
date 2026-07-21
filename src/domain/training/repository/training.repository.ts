@@ -138,10 +138,83 @@ export class TrainingRepository {
       throw new BadRequestException("all training items must have the same userSeq");
     }
 
+    const mode = param.mode ?? "FREE";
+    if (
+      mode === "PROGRAM" &&
+      (!param.userProgramSeq || !param.programDaySeq)
+    ) {
+      throw new BadRequestException(
+        "program training requires userProgramSeq and programDaySeq",
+      );
+    }
+
     return this.prisma.$transaction(async tx => {
+      let programContext: {
+        userProgramSeq: number;
+        programSeq: number;
+        programDaySeq: number;
+      } | null = null;
+
+      if (mode === "PROGRAM") {
+        const userProgram = await tx.user_training_program.findFirst({
+          where: {
+            seq: param.userProgramSeq,
+            user_seq: userSeq,
+            status: "ACTIVE",
+          },
+        });
+        if (!userProgram) {
+          throw new BadRequestException("active user training program not found");
+        }
+
+        const programDay = await tx.training_program_day.findFirst({
+          where: {
+            seq: param.programDaySeq,
+            program_seq: userProgram.program_seq,
+          },
+          include: {
+            training_program_exercises: {
+              select: { training_category_seq: true },
+            },
+          },
+        });
+        if (
+          !programDay ||
+          programDay.week_order !== userProgram.current_week ||
+          programDay.day_order !== userProgram.current_day
+        ) {
+          throw new BadRequestException("program day is not the current session");
+        }
+
+        const allowedCategorySeqs = new Set(
+          programDay.training_program_exercises.map(
+            exercise => exercise.training_category_seq,
+          ),
+        );
+        const invalidItem = param.param.find(
+          item =>
+            !item.trainingCategorySeq ||
+            !allowedCategorySeqs.has(item.trainingCategorySeq),
+        );
+        if (invalidItem) {
+          throw new BadRequestException(
+            "program training contains an invalid training category",
+          );
+        }
+
+        programContext = {
+          userProgramSeq: userProgram.seq,
+          programSeq: userProgram.program_seq,
+          programDaySeq: programDay.seq,
+        };
+      }
+
       const createdTraining = await tx.training.create({
         data: {
-          user_seq: userSeq
+          user_seq: userSeq,
+          mode,
+          user_program_seq: programContext?.userProgramSeq,
+          program_day_seq: programContext?.programDaySeq,
         }
       });
 
@@ -149,34 +222,73 @@ export class TrainingRepository {
         data: param.param.map(item => ({
           training_seq: createdTraining.seq,
           user_seq: userSeq,
+          training_category_seq: item.trainingCategorySeq,
           name: item.name,
           weight: item.weight,
           weight_unit: item.weightUnit,
           reps: item.reps,
           sets: item.sets,
-          rest: this.parseRestTime(item.rest)
+          rest: this.parseRestTime(item.rest),
+          set_order: item.sets,
+          rest_seconds: item.restSeconds ?? this.parseRestSeconds(item.rest),
         }))
       });
+
+      if (programContext) {
+        const programDays = await tx.training_program_day.findMany({
+          where: { program_seq: programContext.programSeq },
+          orderBy: [{ week_order: "asc" }, { day_order: "asc" }],
+          select: { seq: true, week_order: true, day_order: true },
+        });
+        const currentIndex = programDays.findIndex(
+          day => day.seq === programContext.programDaySeq,
+        );
+        const nextDay = programDays[currentIndex + 1];
+
+        await tx.user_training_program.update({
+          where: { seq: programContext.userProgramSeq },
+          data: nextDay
+            ? {
+                current_week: nextDay.week_order,
+                current_day: nextDay.day_order,
+                completed_sessions: { increment: 1 },
+              }
+            : {
+                status: "COMPLETED",
+                completed_at: new Date(),
+                completed_sessions: { increment: 1 },
+              },
+        });
+      }
 
       return createdTraining;
     });
   }
 
   private parseRestTime(rest: string) {
-    const match = rest.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    const match = rest.match(/^(?:(\d{2}):)?(\d{2}):(\d{2})$/);
 
     if (!match) {
-      throw new BadRequestException("rest must be in HH:mm or HH:mm:ss format");
+      throw new BadRequestException("rest must be in mm:ss or HH:mm:ss format");
     }
 
-    const hours = Number(match[1]);
+    const hours = Number(match[1] ?? "0");
     const minutes = Number(match[2]);
-    const seconds = Number(match[3] ?? "0");
+    const seconds = Number(match[3]);
 
     if (hours > 23 || minutes > 59 || seconds > 59) {
       throw new BadRequestException("rest contains an invalid time value");
     }
 
     return new Date(Date.UTC(1970, 0, 1, hours, minutes, seconds));
+  }
+
+  private parseRestSeconds(rest: string) {
+    const parsed = this.parseRestTime(rest);
+    return (
+      parsed.getUTCHours() * 3600 +
+      parsed.getUTCMinutes() * 60 +
+      parsed.getUTCSeconds()
+    );
   }
 }

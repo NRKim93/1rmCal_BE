@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsNumber, IsString } from "class-validator";
+import { IsInt, IsNumber, IsString, Min } from "class-validator";
 
 export class onermRequestDto {
     @ApiProperty ({
@@ -57,6 +57,22 @@ export class OnermSaveDto {
     @Type(() => Number)
     @IsNumber()
     weight: number
+
+    @ApiProperty({
+        description: '1RM 계산에 사용한 실제 수행 중량'
+    })
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0.01)
+    sourceWeight: number
+
+    @ApiProperty({
+        description: '1RM 계산에 사용한 반복 횟수'
+    })
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    sourceReps: number
 
     @ApiProperty({
         description: '단위'
