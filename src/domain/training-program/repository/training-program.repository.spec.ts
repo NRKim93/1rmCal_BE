@@ -1,6 +1,9 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../../common/service/PrismaService';
-import { CreateTrainingProgramRequestDto } from '../dto/create-training-program.dto';
+import {
+  CreateTrainingProgramRequestDto,
+  CreateTrainingProgramVersionRequestDto,
+} from '../dto/create-training-program.dto';
 import { TrainingProgramRepository } from './training-program.repository';
 
 type ProgramCreateArgument = {
@@ -42,11 +45,23 @@ function createRequest(): CreateTrainingProgramRequestDto {
 
 describe('TrainingProgramRepository', () => {
   const tx = {
+    users: {
+      findUnique: jest.fn(),
+    },
     training_program: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      updateMany: jest.fn(),
       create: jest.fn<Promise<unknown>, [ProgramCreateArgument]>(),
     },
     training_category: {
+      findMany: jest.fn(),
+    },
+    user_training_program: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    onerm: {
       findMany: jest.fn(),
     },
   };
@@ -85,6 +100,35 @@ describe('TrainingProgramRepository', () => {
     });
   });
 
+  it('creates the next version and deactivates the previous active version', async () => {
+    const { code: _code, version: _version, ...request } = createRequest();
+    const versionRequest: CreateTrainingProgramVersionRequestDto = request;
+    const created = { seq: 2, code: 'STRONG_LIFTS_5X5', version: 2 };
+    tx.training_program.findUnique.mockResolvedValue({
+      code: 'STRONG_LIFTS_5X5',
+    });
+    tx.training_program.findFirst.mockResolvedValue({ version: 1 });
+    tx.training_category.findMany.mockResolvedValue([{ seq: 10 }]);
+    tx.training_program.updateMany.mockResolvedValue({ count: 1 });
+    tx.training_program.create.mockResolvedValue(created);
+
+    await expect(repository.createVersion(1, versionRequest)).resolves.toEqual(
+      created,
+    );
+    expect(tx.training_program.updateMany).toHaveBeenCalledWith({
+      where: { code: 'STRONG_LIFTS_5X5', is_active: true },
+      data: { is_active: false },
+    });
+    expect(tx.training_program.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          code: 'STRONG_LIFTS_5X5',
+          version: 2,
+        }),
+      }),
+    );
+  });
+
   it('returns active programs with ordered days and exercises', async () => {
     prisma.training_program.findMany.mockResolvedValue([]);
 
@@ -93,6 +137,53 @@ describe('TrainingProgramRepository', () => {
       expect.objectContaining({
         where: { is_active: true },
         orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
+      }),
+    );
+  });
+
+  it('allows an in-progress user to resume an inactive program version', async () => {
+    const programDay = {
+      seq: 101,
+      week_order: 1,
+      day_order: 1,
+      training_program_exercises: [],
+    };
+    const program = {
+      seq: 1,
+      is_active: false,
+      training_program_days: [programDay],
+    };
+    const userProgram = {
+      seq: 201,
+      user_seq: 7,
+      program_seq: 1,
+      status: 'ACTIVE',
+      current_week: 1,
+      current_day: 1,
+    };
+    tx.users.findUnique.mockResolvedValue({ seq: 7 });
+    tx.training_program.findFirst.mockResolvedValue(program);
+    tx.user_training_program.findFirst.mockResolvedValue(userProgram);
+
+    await expect(repository.start(1, 7)).resolves.toEqual({
+      userProgram,
+      program,
+      programDay,
+      oneRmRecords: [],
+    });
+    expect(tx.training_program.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seq: 1,
+          OR: [
+            { is_active: true },
+            {
+              user_programs: {
+                some: { user_seq: 7, status: 'ACTIVE' },
+              },
+            },
+          ],
+        },
       }),
     );
   });

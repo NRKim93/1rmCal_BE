@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { success } from '../../../common/rsData/RsData';
-import { CreateTrainingProgramRequestDto } from '../dto/create-training-program.dto';
+import {
+  CreateTrainingProgramRequestDto,
+  CreateTrainingProgramVersionRequestDto,
+} from '../dto/create-training-program.dto';
 import { StartTrainingProgramRequestDto } from '../dto/start-training-program.dto';
 import { TrainingProgramService } from '../service/training-program.service';
 
@@ -33,6 +36,24 @@ export class TrainingProgramController {
     }
     const programs = await this.service.findActive(parsedUserSeq);
     return success(programs);
+  }
+
+  @Get(':programSeq')
+  @ApiOperation({ summary: '트레이닝 프로그램 단건 조회' })
+  async findOne(@Param('programSeq', ParseIntPipe) programSeq: number) {
+    const program = await this.service.findOne(programSeq);
+    return success(program);
+  }
+
+  @Post(':programSeq/versions')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: '기존 프로그램을 기반으로 새 버전 생성' })
+  async createVersion(
+    @Param('programSeq', ParseIntPipe) programSeq: number,
+    @Body() request: CreateTrainingProgramVersionRequestDto,
+  ) {
+    const program = await this.service.createVersion(programSeq, request);
+    return success(program);
   }
 
   @Post(':programSeq/start')

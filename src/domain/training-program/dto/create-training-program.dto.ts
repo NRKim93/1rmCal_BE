@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Transform, TransformFnParams, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -170,3 +170,8 @@ export class CreateTrainingProgramRequestDto {
   @Type(() => CreateTrainingProgramWeekDto)
   weeks!: CreateTrainingProgramWeekDto[];
 }
+
+export class CreateTrainingProgramVersionRequestDto extends OmitType(
+  CreateTrainingProgramRequestDto,
+  ['code', 'version'] as const,
+) {}

@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateTrainingProgramRequestDto } from '../dto/create-training-program.dto';
+import {
+  CreateTrainingProgramRequestDto,
+  CreateTrainingProgramVersionRequestDto,
+} from '../dto/create-training-program.dto';
 import { TrainingProgramRepository } from '../repository/training-program.repository';
 
 type ProgramWithDetails = Awaited<
@@ -21,6 +24,20 @@ export class TrainingProgramService {
     return programs.map((program) =>
       this.toResponse(program, program.user_programs[0]),
     );
+  }
+
+  async findOne(programSeq: number) {
+    const program = await this.repository.findBySeq(programSeq);
+    return this.toResponse(program);
+  }
+
+  async createVersion(
+    programSeq: number,
+    request: CreateTrainingProgramVersionRequestDto,
+  ) {
+    this.validateProgramStructure(request);
+    const program = await this.repository.createVersion(programSeq, request);
+    return this.toResponse(program);
   }
 
   async start(programSeq: number, userSeq: number) {
@@ -177,7 +194,9 @@ export class TrainingProgramService {
     };
   }
 
-  private validateProgramStructure(request: CreateTrainingProgramRequestDto) {
+  private validateProgramStructure(
+    request: Pick<CreateTrainingProgramRequestDto, 'weeks'>,
+  ) {
     const weekOrders = new Set<number>();
 
     for (const week of request.weeks) {

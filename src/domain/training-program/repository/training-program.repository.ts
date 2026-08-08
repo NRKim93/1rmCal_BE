@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/service/PrismaService';
-import { CreateTrainingProgramRequestDto } from '../dto/create-training-program.dto';
+import {
+  CreateTrainingProgramRequestDto,
+  CreateTrainingProgramVersionRequestDto,
+} from '../dto/create-training-program.dto';
 
 @Injectable()
 export class TrainingProgramRepository {
@@ -21,7 +24,17 @@ export class TrainingProgramRepository {
       if (!user) throw new NotFoundException(`user not found: ${userSeq}`);
 
       const program = await tx.training_program.findFirst({
-        where: { seq: programSeq, is_active: true },
+        where: {
+          seq: programSeq,
+          OR: [
+            { is_active: true },
+            {
+              user_programs: {
+                some: { user_seq: userSeq, status: 'ACTIVE' },
+              },
+            },
+          ],
+        },
         include: {
           training_program_days: {
             orderBy: [{ week_order: 'asc' }, { day_order: 'asc' }],
@@ -51,7 +64,7 @@ export class TrainingProgramRepository {
       });
       if (!program) {
         throw new NotFoundException(
-          `active training program not found: ${programSeq}`,
+          `available training program not found: ${programSeq}`,
         );
       }
 
@@ -125,7 +138,19 @@ export class TrainingProgramRepository {
 
   async findActive(userSeq?: number) {
     return this.prisma.training_program.findMany({
-      where: { is_active: true },
+      where:
+        userSeq === undefined
+          ? { is_active: true }
+          : {
+              OR: [
+                { is_active: true },
+                {
+                  user_programs: {
+                    some: { user_seq: userSeq, status: 'ACTIVE' },
+                  },
+                },
+              ],
+            },
       orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
       include: {
         user_programs: {
@@ -158,6 +183,161 @@ export class TrainingProgramRepository {
           },
         },
       },
+    });
+  }
+
+  async findBySeq(programSeq: number) {
+    const program = await this.prisma.training_program.findUnique({
+      where: { seq: programSeq },
+      include: {
+        training_program_days: {
+          orderBy: [{ week_order: 'asc' }, { day_order: 'asc' }],
+          include: {
+            training_program_exercises: {
+              orderBy: { exercise_order: 'asc' },
+              include: {
+                training_category: {
+                  select: {
+                    seq: true,
+                    training_name: true,
+                    training_display_name: true,
+                  },
+                },
+                one_rm_reference_category: {
+                  select: {
+                    seq: true,
+                    training_name: true,
+                    training_display_name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!program) {
+      throw new NotFoundException(`training program not found: ${programSeq}`);
+    }
+    return program;
+  }
+
+  async createVersion(
+    sourceProgramSeq: number,
+    request: CreateTrainingProgramVersionRequestDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const source = await tx.training_program.findUnique({
+        where: { seq: sourceProgramSeq },
+        select: { code: true },
+      });
+      if (!source) {
+        throw new NotFoundException(
+          `training program not found: ${sourceProgramSeq}`,
+        );
+      }
+
+      const latest = await tx.training_program.findFirst({
+        where: { code: source.code },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+      const nextVersion = (latest?.version ?? 0) + 1;
+      const categorySeqs = [
+        ...new Set(
+          request.weeks.flatMap((week) =>
+            week.days.flatMap((day) =>
+              day.exercises.flatMap((exercise) => [
+                exercise.trainingCategorySeq,
+                ...(exercise.oneRmReferenceCategorySeq
+                  ? [exercise.oneRmReferenceCategorySeq]
+                  : []),
+              ]),
+            ),
+          ),
+        ),
+      ];
+      const categories = await tx.training_category.findMany({
+        where: { seq: { in: categorySeqs } },
+        select: { seq: true },
+      });
+      const existingCategorySeqs = new Set(
+        categories.map((category) => category.seq),
+      );
+      const missingCategorySeqs = categorySeqs.filter(
+        (seq) => !existingCategorySeqs.has(seq),
+      );
+      if (missingCategorySeqs.length > 0) {
+        throw new BadRequestException(
+          `training categories not found: ${missingCategorySeqs.join(', ')}`,
+        );
+      }
+
+      if (request.isActive) {
+        await tx.training_program.updateMany({
+          where: { code: source.code, is_active: true },
+          data: { is_active: false },
+        });
+      }
+
+      return tx.training_program.create({
+        data: {
+          code: source.code,
+          name: request.name,
+          description: request.description,
+          version: nextVersion,
+          is_active: request.isActive,
+          training_program_days: {
+            create: request.weeks.flatMap((week) =>
+              week.days.map((day) => ({
+                week_order: week.weekOrder,
+                day_order: day.dayOrder,
+                name: day.name,
+                training_program_exercises: {
+                  create: day.exercises.map((exercise) => ({
+                    training_category_seq: exercise.trainingCategorySeq,
+                    one_rm_reference_category_seq:
+                      exercise.oneRmReferenceCategorySeq,
+                    exercise_order: exercise.exerciseOrder,
+                    target_sets: exercise.targetSets,
+                    target_reps_min: exercise.targetRepsMin,
+                    target_reps_max: exercise.targetRepsMax,
+                    rest_seconds: exercise.restSeconds,
+                    target_weight_rate: exercise.targetWeightRate,
+                  })),
+                },
+              })),
+            ),
+          },
+        },
+        include: {
+          training_program_days: {
+            orderBy: [{ week_order: 'asc' }, { day_order: 'asc' }],
+            include: {
+              training_program_exercises: {
+                orderBy: { exercise_order: 'asc' },
+                include: {
+                  training_category: {
+                    select: {
+                      seq: true,
+                      training_name: true,
+                      training_display_name: true,
+                    },
+                  },
+                  one_rm_reference_category: {
+                    select: {
+                      seq: true,
+                      training_name: true,
+                      training_display_name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
     });
   }
 
