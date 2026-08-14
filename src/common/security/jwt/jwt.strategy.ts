@@ -1,8 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import {ErrorCode} from "../../exception/error-code.enum";
 
 //  cookie에서 accessToken 취득
 function accessCookieExtractor(req:any) : string | null {
@@ -39,6 +38,9 @@ export class JwtStrategy extends PassportStrategy(Strategy,'jwt') {
 
   async validate(payload: any) {
     // payload: JWT에 담긴 사용자 정보
+    if (payload?.typ !== 'access' || !payload?.sub) {
+      throw new UnauthorizedException('invalid access token');
+    }
     return payload;
   }
 }

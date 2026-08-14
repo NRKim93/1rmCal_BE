@@ -9,9 +9,11 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { success } from '../../../common/rsData/RsData';
+import { JwtAuthGuard } from '../../../common/security/jwt/jwt.guard';
 import {
   CreateTrainingProgramRequestDto,
   CreateTrainingProgramVersionRequestDto,
@@ -46,6 +48,7 @@ export class TrainingProgramController {
   }
 
   @Post(':programSeq/versions')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '기존 프로그램을 기반으로 새 버전 생성' })
   async createVersion(
@@ -68,6 +71,7 @@ export class TrainingProgramController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '정규 트레이닝 프로그램 등록' })
   async create(@Body() request: CreateTrainingProgramRequestDto) {
