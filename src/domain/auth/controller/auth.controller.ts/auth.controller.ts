@@ -3,7 +3,9 @@ import {checked, RsData, success} from "../../../../common/rsData/RsData";
 import {Response,Request} from "express";
 import {HttpStatusCode} from "axios";
 import {AuthService} from "../../service/auth.service";
+import { Public } from '../../../../common/security/public.decorator';
 
+@Public()
 @Controller('/api/v1/auth')
 export class AuthController {
     constructor(

@@ -162,6 +162,14 @@ export class CreateTrainingProgramRequestDto {
   @IsBoolean()
   isActive = true;
 
+  @ApiPropertyOptional({
+    description: '다른 사용자가 검색하고 복사할 수 있는 공개 프로그램 여부',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublic = false;
+
   @ApiProperty({ type: [CreateTrainingProgramWeekDto] })
   @IsArray()
   @ArrayMinSize(1)

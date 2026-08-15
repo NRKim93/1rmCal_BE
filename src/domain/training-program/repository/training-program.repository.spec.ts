@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../common/service/PrismaService';
 import {
   CreateTrainingProgramRequestDto,
@@ -20,6 +24,7 @@ function createRequest(): CreateTrainingProgramRequestDto {
     name: '스트롱리프트 5x5',
     version: 1,
     isActive: true,
+    isPublic: false,
     weeks: [
       {
         weekOrder: 1,
@@ -84,11 +89,11 @@ describe('TrainingProgramRepository', () => {
   it('creates a program and all children in one transaction', async () => {
     const request = createRequest();
     const created = { seq: 1, code: request.code, version: request.version };
-    tx.training_program.findUnique.mockResolvedValue(null);
+    tx.training_program.findFirst.mockResolvedValue(null);
     tx.training_category.findMany.mockResolvedValue([{ seq: 10 }]);
     tx.training_program.create.mockResolvedValue(created);
 
-    await expect(repository.create(request)).resolves.toEqual(created);
+    await expect(repository.create(7, request)).resolves.toEqual(created);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.training_program.create).toHaveBeenCalledTimes(1);
     const createArgument = tx.training_program.create.mock.calls[0]?.[0];
@@ -106,17 +111,22 @@ describe('TrainingProgramRepository', () => {
     const created = { seq: 2, code: 'STRONG_LIFTS_5X5', version: 2 };
     tx.training_program.findUnique.mockResolvedValue({
       code: 'STRONG_LIFTS_5X5',
+      owner_user_seq: 7,
     });
     tx.training_program.findFirst.mockResolvedValue({ version: 1 });
     tx.training_category.findMany.mockResolvedValue([{ seq: 10 }]);
     tx.training_program.updateMany.mockResolvedValue({ count: 1 });
     tx.training_program.create.mockResolvedValue(created);
 
-    await expect(repository.createVersion(1, versionRequest)).resolves.toEqual(
+    await expect(repository.createVersion(1, 7, versionRequest)).resolves.toEqual(
       created,
     );
     expect(tx.training_program.updateMany).toHaveBeenCalledWith({
-      where: { code: 'STRONG_LIFTS_5X5', is_active: true },
+      where: {
+        code: 'STRONG_LIFTS_5X5',
+        owner_user_seq: 7,
+        is_active: true,
+      },
       data: { is_active: false },
     });
     expect(tx.training_program.create).toHaveBeenCalledWith(
@@ -129,13 +139,86 @@ describe('TrainingProgramRepository', () => {
     );
   });
 
+  it('rejects a new version when the requester does not own the source', async () => {
+    const { code: _code, version: _version, ...request } = createRequest();
+    tx.training_program.findUnique.mockResolvedValue({
+      code: 'APRO',
+      owner_user_seq: 1,
+    });
+
+    await expect(repository.createVersion(1, 2, request)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(tx.training_program.create).not.toHaveBeenCalled();
+  });
+
+  it('downloads a public program as an independent private copy', async () => {
+    const source = {
+      seq: 11,
+      owner_user_seq: 1,
+      code: 'APRO',
+      name: 'Apro',
+      description: 'shared program',
+      version: 3,
+      is_active: true,
+      is_public: true,
+      training_program_days: [
+        {
+          week_order: 1,
+          day_order: 1,
+          name: 'Day 1',
+          training_program_exercises: [
+            {
+              training_category_seq: 10,
+              one_rm_reference_category_seq: null,
+              exercise_order: 1,
+              target_sets: 5,
+              target_reps_min: 5,
+              target_reps_max: 5,
+              rest_seconds: 180,
+              target_weight_rate: null,
+            },
+          ],
+        },
+      ],
+    };
+    const downloaded = { seq: 21, owner_user_seq: 2, code: 'APRO' };
+    tx.training_program.findFirst
+      .mockResolvedValueOnce(source)
+      .mockResolvedValueOnce(null);
+    tx.training_program.create.mockResolvedValue(downloaded);
+
+    await expect(repository.download(11, 2)).resolves.toEqual(downloaded);
+    expect(tx.training_program.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          owner_user_seq: 2,
+          source_program_seq: 11,
+          code: 'APRO',
+          version: 1,
+          is_active: true,
+          is_public: false,
+        }),
+      }),
+    );
+  });
+
   it('returns active programs with ordered days and exercises', async () => {
     prisma.training_program.findMany.mockResolvedValue([]);
 
-    await expect(repository.findActive()).resolves.toEqual([]);
+    await expect(repository.findActive(7)).resolves.toEqual([]);
     expect(prisma.training_program.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { is_active: true },
+        where: {
+          OR: [
+            { owner_user_seq: 7, is_active: true },
+            {
+              user_programs: {
+                some: { user_seq: 7, status: 'ACTIVE' },
+              },
+            },
+          ],
+        },
         orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
       }),
     );
@@ -176,7 +259,7 @@ describe('TrainingProgramRepository', () => {
         where: {
           seq: 1,
           OR: [
-            { is_active: true },
+            { owner_user_seq: 7, is_active: true },
             {
               user_programs: {
                 some: { user_seq: 7, status: 'ACTIVE' },
@@ -189,19 +272,19 @@ describe('TrainingProgramRepository', () => {
   });
 
   it('rejects an existing code and version', async () => {
-    tx.training_program.findUnique.mockResolvedValue({ seq: 1 });
+    tx.training_program.findFirst.mockResolvedValue({ seq: 1 });
 
-    await expect(repository.create(createRequest())).rejects.toThrow(
+    await expect(repository.create(7, createRequest())).rejects.toThrow(
       ConflictException,
     );
     expect(tx.training_program.create).not.toHaveBeenCalled();
   });
 
   it('rejects missing training categories', async () => {
-    tx.training_program.findUnique.mockResolvedValue(null);
+    tx.training_program.findFirst.mockResolvedValue(null);
     tx.training_category.findMany.mockResolvedValue([]);
 
-    await expect(repository.create(createRequest())).rejects.toThrow(
+    await expect(repository.create(7, createRequest())).rejects.toThrow(
       BadRequestException,
     );
     expect(tx.training_program.create).not.toHaveBeenCalled();

@@ -13,31 +13,48 @@ type ProgramWithDetails = Awaited<
 export class TrainingProgramService {
   constructor(private readonly repository: TrainingProgramRepository) {}
 
-  async create(request: CreateTrainingProgramRequestDto) {
+  async create(userSeq: number, request: CreateTrainingProgramRequestDto) {
     this.validateProgramStructure(request);
-    const program = await this.repository.create(request);
-    return this.toResponse(program);
+    const program = await this.repository.create(userSeq, request);
+    return this.toResponse(program, undefined, userSeq);
   }
 
-  async findActive(userSeq?: number) {
+  async findActive(userSeq: number) {
     const programs = await this.repository.findActive(userSeq);
     return programs.map((program) =>
-      this.toResponse(program, program.user_programs[0]),
+      this.toResponse(program, program.user_programs[0], userSeq),
     );
   }
 
-  async findOne(programSeq: number) {
-    const program = await this.repository.findBySeq(programSeq);
-    return this.toResponse(program);
+  async findShared(userSeq: number) {
+    const programs = await this.repository.findShared(userSeq);
+    return programs.map((program) =>
+      this.toResponse(program, program.user_programs[0], userSeq),
+    );
+  }
+
+  async findOne(programSeq: number, userSeq: number) {
+    const program = await this.repository.findBySeq(programSeq, userSeq);
+    return this.toResponse(program, undefined, userSeq);
   }
 
   async createVersion(
     programSeq: number,
+    userSeq: number,
     request: CreateTrainingProgramVersionRequestDto,
   ) {
     this.validateProgramStructure(request);
-    const program = await this.repository.createVersion(programSeq, request);
-    return this.toResponse(program);
+    const program = await this.repository.createVersion(
+      programSeq,
+      userSeq,
+      request,
+    );
+    return this.toResponse(program, undefined, userSeq);
+  }
+
+  async download(programSeq: number, userSeq: number) {
+    const program = await this.repository.download(programSeq, userSeq);
+    return this.toResponse(program, undefined, userSeq);
   }
 
   async start(programSeq: number, userSeq: number) {
@@ -119,6 +136,7 @@ export class TrainingProgramService {
       current_day: number;
       completed_sessions: number;
     },
+    viewerUserSeq?: number,
   ) {
     const weekOrders = [
       ...new Set(program.training_program_days.map((day) => day.week_order)),
@@ -143,6 +161,10 @@ export class TrainingProgramService {
       description: program.description,
       version: program.version,
       isActive: program.is_active,
+      isPublic: program.is_public,
+      ownerUserSeq: program.owner_user_seq,
+      sourceProgramSeq: program.source_program_seq,
+      isOwner: program.owner_user_seq === viewerUserSeq,
       createdAt: program.created_at,
       updatedAt: program.updated_at,
       progress: {

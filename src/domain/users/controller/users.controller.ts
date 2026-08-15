@@ -8,8 +8,10 @@ import {UserJoinRequestDto} from "../dto/user-join-request.dto";
 import {HttpStatusCode} from "axios";
 import {Response} from "express";
 import { NaverTokenResponseDto } from '../dto/naver-token-response.dto';
+import { Public } from '../../../common/security/public.decorator';
 
 @ApiTags('Users')
+@Public()
 @Controller('/api/v1/users')
 export class UsersController {
     constructor(
@@ -34,4 +36,4 @@ export class UsersController {
         return  await success(newNickName);
     }
 
-} 
+}

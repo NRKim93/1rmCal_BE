@@ -9,6 +9,9 @@ import { TrainingController } from './domain/training/controller/training.contro
 import { TrainingService } from './domain/training/service/training.service';
 import { TrainingModule } from './domain/training/training.module';
 import { TrainingProgramModule } from './domain/training-program/training-program.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './common/security/jwt/jwt.guard';
+import { JwtModule } from './common/security/jwt/jwt.module';
 
 @Module({
   imports: [
@@ -22,8 +25,13 @@ import { TrainingProgramModule } from './domain/training-program/training-progra
     RedisModule,
     TrainingModule,
     TrainingProgramModule,
+    JwtModule,
   ],
-  providers: [RedisService, TrainingService],
+  providers: [
+    RedisService,
+    TrainingService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
   controllers: [TrainingController],
 })
 export class AppModule {}

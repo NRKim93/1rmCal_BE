@@ -21,6 +21,7 @@ function createRequest(): CreateTrainingProgramRequestDto {
     description: '전신 근력 프로그램',
     version: 1,
     isActive: true,
+    isPublic: false,
     weeks: [
       {
         weekOrder: 1,
@@ -119,14 +120,17 @@ describe('TrainingProgramService', () => {
       name: request.name,
       description: '전신 근력 프로그램',
       version: request.version,
+      owner_user_seq: 1,
       is_active: request.isActive,
+      is_public: request.isPublic,
+      source_program_seq: null,
       created_at: new Date('2026-07-19T00:00:00Z'),
       updated_at: new Date('2026-07-19T00:00:00Z'),
       training_program_days: [],
     };
     repository.create.mockResolvedValue(createdProgram);
 
-    const result = await service.create(request);
+    const result = await service.create(1, request);
 
     expect(result).toMatchObject({
       seq: 1,
@@ -134,7 +138,7 @@ describe('TrainingProgramService', () => {
       isActive: true,
       weeks: [],
     });
-    expect(repository.create).toHaveBeenCalledWith(request);
+    expect(repository.create).toHaveBeenCalledWith(1, request);
   });
 
   it('returns active programs in the create response shape', async () => {
@@ -146,7 +150,10 @@ describe('TrainingProgramService', () => {
         name: request.name,
         description: request.description ?? null,
         version: request.version,
+        owner_user_seq: 1,
         is_active: true,
+        is_public: false,
+        source_program_seq: null,
         created_at: new Date('2026-07-19T00:00:00Z'),
         updated_at: new Date('2026-07-19T00:00:00Z'),
         user_programs: [],
@@ -154,7 +161,7 @@ describe('TrainingProgramService', () => {
       },
     ]);
 
-    await expect(service.findActive()).resolves.toEqual([
+    await expect(service.findActive(1)).resolves.toEqual([
       expect.objectContaining({
         seq: 1,
         code: request.code,
@@ -169,7 +176,7 @@ describe('TrainingProgramService', () => {
         weeks: [],
       }),
     ]);
-    expect(repository.findActive).toHaveBeenCalledTimes(1);
+    expect(repository.findActive).toHaveBeenCalledWith(1);
   });
 
   it('returns the current session when a user starts a program', async () => {
@@ -240,7 +247,10 @@ describe('TrainingProgramService', () => {
         name: '테스트 프로그램',
         description: null,
         version: 1,
+        owner_user_seq: 1,
         is_active: true,
+        is_public: false,
+        source_program_seq: null,
         created_at: new Date('2026-07-20T00:00:00Z'),
         updated_at: new Date('2026-07-20T00:00:00Z'),
         training_program_days: [programDay],
@@ -307,7 +317,7 @@ describe('TrainingProgramService', () => {
     const firstWeek = getFirstWeek(request);
     request.weeks.push({ ...firstWeek });
 
-    await expect(service.create(request)).rejects.toThrow(BadRequestException);
+    await expect(service.create(1, request)).rejects.toThrow(BadRequestException);
     expect(repository.create).not.toHaveBeenCalled();
   });
 
@@ -317,7 +327,7 @@ describe('TrainingProgramService', () => {
     const firstDay = getFirstDay(request);
     firstWeek.days.push({ ...firstDay, name: '중복 회차' });
 
-    await expect(service.create(request)).rejects.toThrow(
+    await expect(service.create(1, request)).rejects.toThrow(
       'duplicate program day',
     );
   });
@@ -331,7 +341,7 @@ describe('TrainingProgramService', () => {
       trainingCategorySeq: 2,
     });
 
-    await expect(service.create(request)).rejects.toThrow(
+    await expect(service.create(1, request)).rejects.toThrow(
       'duplicate exercise order',
     );
   });
@@ -345,7 +355,7 @@ describe('TrainingProgramService', () => {
       exerciseOrder: 2,
     });
 
-    await expect(service.create(request)).rejects.toThrow(
+    await expect(service.create(1, request)).rejects.toThrow(
       'duplicate training category',
     );
   });
@@ -356,7 +366,7 @@ describe('TrainingProgramService', () => {
     firstExercise.targetRepsMin = 8;
     firstExercise.targetRepsMax = 5;
 
-    await expect(service.create(request)).rejects.toThrow(
+    await expect(service.create(1, request)).rejects.toThrow(
       'targetRepsMin cannot exceed targetRepsMax',
     );
   });

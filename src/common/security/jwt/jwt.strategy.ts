@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../service/PrismaService';
 
 //  cookie에서 accessToken 취득
 function accessCookieExtractor(req:any) : string | null {
@@ -23,7 +24,10 @@ function refreshCookieExtractor(req:any) : string | null {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy,'jwt') {
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
       const pub = configService.get<string>('JWT_PUBLIC_KEY');
       if (!pub) throw new Error('JWT_PUBLIC_KEY_FAILED');
       const publicKey = Buffer.from(pub, 'base64').toString('utf-8');
@@ -41,7 +45,13 @@ export class JwtStrategy extends PassportStrategy(Strategy,'jwt') {
     if (payload?.typ !== 'access' || !payload?.sub) {
       throw new UnauthorizedException('invalid access token');
     }
-    return payload;
+    const oauth = await this.prisma.oauths.findFirst({
+      where: { identify: String(payload.sub) },
+      select: { user_seq: true },
+    });
+    if (!oauth) throw new UnauthorizedException('user not found');
+
+    return { ...payload, userSeq: oauth.user_seq };
   }
 }
 

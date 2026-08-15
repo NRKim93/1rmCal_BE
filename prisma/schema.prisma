@@ -28,14 +28,15 @@ model idtables {
 }
 
 model users {
-  seq                   Int                     @id @default(autoincrement())
-  id                    String                  @unique @db.VarChar(100)
-  nickname              String                  @db.VarChar(100)
-  email                 String                  @unique @db.VarChar(100)
-  oauths                oauths[]
-  traing                training[]
-  training_history      training_history[]
-  user_training_program user_training_program[]
+  seq                     Int                     @id @default(autoincrement())
+  id                      String                  @unique @db.VarChar(100)
+  nickname                String                  @db.VarChar(100)
+  email                   String                  @unique @db.VarChar(100)
+  oauths                  oauths[]
+  traing                  training[]
+  training_history        training_history[]
+  user_training_program   user_training_program[]
+  owned_training_programs training_program[]
 }
 
 model oauths {
@@ -49,23 +50,23 @@ model oauths {
 /// 운동 종목의 정규 코드, 표시명 및 분류 정보를 관리하는 마스터 테이블.
 model training_category {
   /// 운동 종목 내부 PK.
-  seq                   Int                         @id @default(autoincrement())
+  seq                          Int                         @id @default(autoincrement())
   /// API와 프로그램에서 사용하는 변경되지 않는 정규 코드. 예: BENCH_PRESS.
-  training_name         String                      @unique @db.VarChar(100)
+  training_name                String                      @unique @db.VarChar(100)
   /// 사용자 화면에 노출하는 운동 종목명.
-  training_display_name String                      @db.VarChar(100)
+  training_display_name        String                      @db.VarChar(100)
   /// 운동 기구 유형. 현재 문자열이며 추후 training_type enum으로 전환한다.
-  training_type         String                      @db.VarChar(100)
+  training_type                String                      @db.VarChar(100)
   /// 상체, 하체 등 운동 부위의 상위 분류.
-  target_category       String                      @db.VarChar(100)
+  target_category              String                      @db.VarChar(100)
   /// 운동의 대표 타깃 근육. 다중 근육 지원 시 연결 테이블로 분리한다.
-  target_muscle         String                      @db.VarChar(100)
+  target_muscle                String                      @db.VarChar(100)
   /// 이 종목을 목표 운동으로 포함하는 프로그램 구성 목록.
-  program_exercises     training_program_exercise[] @relation("ProgramExerciseCategory")
+  program_exercises            training_program_exercise[] @relation("ProgramExerciseCategory")
   /// 이 종목의 1RM을 기준으로 중량을 추정하는 프로그램 운동 목록.
   referenced_program_exercises training_program_exercise[] @relation("ProgramExerciseOneRmReference")
   /// 이 종목으로 기록된 실제 수행 세트 목록.
-  training_history      training_history[]
+  training_history             training_history[]
 }
 
 enum training_type {
@@ -190,6 +191,7 @@ model training_history {
 model training_program {
   /// 프로그램 버전 내부 PK.
   seq                   Int                     @id @default(autoincrement())
+  owner_user_seq        Int?
   /// 프로그램 버전 간 공유하는 정규 식별 코드.
   code                  String                  @db.VarChar(50)
   /// 사용자 화면에 노출하는 프로그램명.
@@ -200,6 +202,10 @@ model training_program {
   version               Int                     @default(1)
   /// 신규 사용자에게 선택 가능한 버전인지 여부.
   is_active             Boolean                 @default(true)
+  /// 작성자가 다른 사용자에게 검색과 다운로드를 허용했는지 여부.
+  is_public             Boolean                 @default(true)
+  /// 공유 프로그램을 복사한 경우 원본 프로그램 버전의 PK.
+  source_program_seq    Int?
   /// 프로그램 버전 생성 시각.
   created_at            DateTime                @default(now()) @db.DateTime(0)
   /// 프로그램 버전 마지막 수정 시각.
@@ -208,8 +214,12 @@ model training_program {
   training_program_days training_program_day[]
   /// 이 프로그램 버전을 시작한 사용자 진행 목록.
   user_programs         user_training_program[]
+  owner                 users?                  @relation(fields: [owner_user_seq], references: [seq], onDelete: SetNull)
 
-  @@unique([code, version])
+  @@unique([owner_user_seq, code, version])
+  @@index([owner_user_seq, is_active])
+  @@index([is_public, is_active])
+  @@index([source_program_seq])
 }
 
 /// 정규 프로그램에서 특정 주차와 일차에 수행할 한 회차의 정의 테이블.
@@ -237,31 +247,31 @@ model training_program_day {
 /// 프로그램 회차에 포함된 운동 종목과 목표 세트 조건을 정의하는 테이블.
 model training_program_exercise {
   /// 프로그램 운동 구성 내부 PK.
-  seq                   Int                  @id @default(autoincrement())
+  seq                           Int                  @id @default(autoincrement())
   /// 상위 프로그램 회차 FK.
-  program_day_seq       Int
+  program_day_seq               Int
   /// 목표 운동 종목 FK.
-  training_category_seq Int
+  training_category_seq         Int
   /// 직접 1RM이 없는 운동에서 목표 중량 계산에 사용할 기준 운동 종목 FK.
   one_rm_reference_category_seq Int?
   /// 회차 안에서 1부터 시작하는 운동 수행 및 표시 순서.
-  exercise_order        Int
+  exercise_order                Int
   /// 목표 세트 수.
-  target_sets           Int
+  target_sets                   Int
   /// 세트당 목표 반복 횟수의 최솟값.
-  target_reps_min       Int
+  target_reps_min               Int
   /// 세트당 목표 반복 횟수의 최댓값.
-  target_reps_max       Int
+  target_reps_max               Int
   /// 세트 사이의 목표 휴식 시간(초).
-  rest_seconds          Int?
+  rest_seconds                  Int?
   /// 1RM 대비 목표 중량 백분율. 예: 75.00은 75%.
-  target_weight_rate    Decimal?             @db.Decimal(5, 2)
+  target_weight_rate            Decimal?             @db.Decimal(5, 2)
   /// 이 운동 구성이 속한 프로그램 회차.
-  training_program_day  training_program_day @relation(fields: [program_day_seq], references: [seq], onDelete: Cascade)
+  training_program_day          training_program_day @relation(fields: [program_day_seq], references: [seq], onDelete: Cascade)
   /// 목표 운동 종목.
-  training_category     training_category    @relation("ProgramExerciseCategory", fields: [training_category_seq], references: [seq])
+  training_category             training_category    @relation("ProgramExerciseCategory", fields: [training_category_seq], references: [seq])
   /// 목표 중량 계산에 사용할 기준 1RM 운동 종목.
-  one_rm_reference_category training_category? @relation("ProgramExerciseOneRmReference", fields: [one_rm_reference_category_seq], references: [seq])
+  one_rm_reference_category     training_category?   @relation("ProgramExerciseOneRmReference", fields: [one_rm_reference_category_seq], references: [seq])
 
   @@unique([program_day_seq, exercise_order])
   @@index([training_category_seq])
