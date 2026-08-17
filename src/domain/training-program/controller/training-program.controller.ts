@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -25,14 +26,20 @@ export class TrainingProgramController {
 
   @Get('active')
   @ApiOperation({ summary: '내 활성 트레이닝 프로그램 목록 조회' })
-  async findActive(@Req() req: AuthenticatedRequest) {
-    return success(await this.service.findActive(req.user.userSeq));
+  async findActive(
+    @Req() req: AuthenticatedRequest,
+    @Query('q') query?: string,
+  ) {
+    return success(await this.service.findActive(req.user.userSeq, query));
   }
 
   @Get('shared')
   @ApiOperation({ summary: '다른 사용자가 공개한 프로그램 목록 조회' })
-  async findShared(@Req() req: AuthenticatedRequest) {
-    return success(await this.service.findShared(req.user.userSeq));
+  async findShared(
+    @Req() req: AuthenticatedRequest,
+    @Query('q') query?: string,
+  ) {
+    return success(await this.service.findShared(req.user.userSeq, query));
   }
 
   @Get(':programSeq')

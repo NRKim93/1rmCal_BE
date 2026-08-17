@@ -19,18 +19,31 @@ export class TrainingProgramService {
     return this.toResponse(program, undefined, userSeq);
   }
 
-  async findActive(userSeq: number) {
-    const programs = await this.repository.findActive(userSeq);
+  async findActive(userSeq: number, query?: string) {
+    const normalizedQuery = this.normalizeSearchQuery(query);
+    const programs = await this.repository.findActive(userSeq, normalizedQuery);
     return programs.map((program) =>
       this.toResponse(program, program.user_programs[0], userSeq),
     );
   }
 
-  async findShared(userSeq: number) {
-    const programs = await this.repository.findShared(userSeq);
+  async findShared(userSeq: number, query?: string) {
+    const normalizedQuery = this.normalizeSearchQuery(query);
+    const programs = await this.repository.findShared(
+      userSeq,
+      normalizedQuery || undefined,
+    );
     return programs.map((program) =>
       this.toResponse(program, program.user_programs[0], userSeq),
     );
+  }
+
+  private normalizeSearchQuery(query?: string) {
+    const normalizedQuery = query?.trim();
+    if (normalizedQuery && normalizedQuery.length > 100) {
+      throw new BadRequestException('search query is too long');
+    }
+    return normalizedQuery || undefined;
   }
 
   async findOne(programSeq: number, userSeq: number) {

@@ -176,7 +176,7 @@ describe('TrainingProgramService', () => {
         weeks: [],
       }),
     ]);
-    expect(repository.findActive).toHaveBeenCalledWith(1);
+    expect(repository.findActive).toHaveBeenCalledWith(1, undefined);
   });
 
   it('returns the current session when a user starts a program', async () => {

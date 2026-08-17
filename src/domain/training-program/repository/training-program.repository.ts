@@ -137,16 +137,21 @@ export class TrainingProgramRepository {
     });
   }
 
-  async findActive(userSeq: number) {
+  async findActive(userSeq: number, query?: string) {
     return this.prisma.training_program.findMany({
       where: {
-        OR: [
-          { owner_user_seq: userSeq, is_active: true },
+        AND: [
           {
-            user_programs: {
-              some: { user_seq: userSeq, status: 'ACTIVE' },
-            },
+            OR: [
+              { owner_user_seq: userSeq, is_active: true },
+              {
+                user_programs: {
+                  some: { user_seq: userSeq, status: 'ACTIVE' },
+                },
+              },
+            ],
           },
+          ...(query ? [this.createSearchWhere(query)] : []),
         ],
       },
       orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
@@ -184,14 +189,19 @@ export class TrainingProgramRepository {
     });
   }
 
-  async findShared(userSeq: number) {
+  async findShared(userSeq: number, query?: string) {
     return this.prisma.training_program.findMany({
       where: {
         is_active: true,
         is_public: true,
-        OR: [
-          { owner_user_seq: null },
-          { owner_user_seq: { not: userSeq } },
+        AND: [
+          {
+            OR: [
+              { owner_user_seq: null },
+              { owner_user_seq: { not: userSeq } },
+            ],
+          },
+          ...(query ? [this.createSearchWhere(query)] : []),
         ],
       },
       orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
@@ -618,5 +628,33 @@ export class TrainingProgramRepository {
 
       throw error;
     }
+  }
+
+  private createSearchWhere(
+    query: string,
+  ): Prisma.training_programWhereInput {
+    return {
+      OR: [
+        { name: { contains: query } },
+        { code: { contains: query } },
+        { description: { contains: query } },
+        {
+          training_program_days: {
+            some: {
+              training_program_exercises: {
+                some: {
+                  training_category: {
+                    OR: [
+                      { training_name: { contains: query } },
+                      { training_display_name: { contains: query } },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
   }
 }

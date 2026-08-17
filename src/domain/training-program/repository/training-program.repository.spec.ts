@@ -210,16 +210,64 @@ describe('TrainingProgramRepository', () => {
     expect(prisma.training_program.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          OR: [
-            { owner_user_seq: 7, is_active: true },
+          AND: [
             {
-              user_programs: {
-                some: { user_seq: 7, status: 'ACTIVE' },
-              },
+              OR: [
+                { owner_user_seq: 7, is_active: true },
+                {
+                  user_programs: {
+                    some: { user_seq: 7, status: 'ACTIVE' },
+                  },
+                },
+              ],
             },
           ],
         },
         orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
+      }),
+    );
+  });
+
+  it('searches active programs by program and exercise text', async () => {
+    prisma.training_program.findMany.mockResolvedValue([]);
+
+    await expect(repository.findActive(7, 'squat')).resolves.toEqual([]);
+    expect(prisma.training_program.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { name: { contains: 'squat' } },
+                { code: { contains: 'squat' } },
+                { description: { contains: 'squat' } },
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('searches shared programs by program and exercise text', async () => {
+    prisma.training_program.findMany.mockResolvedValue([]);
+
+    await expect(repository.findShared(7, 'squat')).resolves.toEqual([]);
+    expect(prisma.training_program.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          is_active: true,
+          is_public: true,
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { name: { contains: 'squat' } },
+                { code: { contains: 'squat' } },
+                { description: { contains: 'squat' } },
+              ]),
+            }),
+          ]),
+        }),
       }),
     );
   });
