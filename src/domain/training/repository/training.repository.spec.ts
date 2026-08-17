@@ -20,6 +20,9 @@ describe('TrainingRepository program session', () => {
     },
   };
   const prisma = {
+    training_history: {
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(
       (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
     ),
@@ -30,6 +33,71 @@ describe('TrainingRepository program session', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('returns every exercise from its most recent session with all sets', async () => {
+    prisma.training_history.findMany.mockResolvedValue([
+      {
+        training_seq: 20,
+        training_category_seq: 3,
+        name: 'Bench Press',
+        weight: 80,
+        weight_unit: 'kg',
+        reps: 8,
+        set_order: 1,
+        training: {training_date: new Date('2026-08-17T00:00:00Z')},
+      },
+      {
+        training_seq: 20,
+        training_category_seq: 3,
+        name: 'Bench Press',
+        weight: 90,
+        weight_unit: 'kg',
+        reps: 5,
+        set_order: 2,
+        training: {training_date: new Date('2026-08-17T00:00:00Z')},
+      },
+      {
+        training_seq: 10,
+        training_category_seq: 3,
+        name: 'Bench Press',
+        weight: 70,
+        weight_unit: 'kg',
+        reps: 10,
+        set_order: 1,
+        training: {training_date: new Date('2026-07-20T00:00:00Z')},
+      },
+      {
+        training_seq: 10,
+        training_category_seq: 4,
+        name: 'Squat',
+        weight: 100,
+        weight_unit: 'kg',
+        reps: 5,
+        set_order: 1,
+        training: {training_date: new Date('2026-07-20T00:00:00Z')},
+      },
+    ]);
+
+    await expect(repository.getLatestExerciseHistoryByUser(1)).resolves.toEqual([
+      {
+        trainingSeq: 20,
+        trainingCategorySeq: 3,
+        name: 'Bench Press',
+        trainingDate: new Date('2026-08-17T00:00:00Z'),
+        sets: [
+          {setOrder: 1, weight: 80, weightUnit: 'kg', reps: 8},
+          {setOrder: 2, weight: 90, weightUnit: 'kg', reps: 5},
+        ],
+      },
+      {
+        trainingSeq: 10,
+        trainingCategorySeq: 4,
+        name: 'Squat',
+        trainingDate: new Date('2026-07-20T00:00:00Z'),
+        sets: [{setOrder: 1, weight: 100, weightUnit: 'kg', reps: 5}],
+      },
+    ]);
   });
 
   it('stores program references and advances to the next session', async () => {

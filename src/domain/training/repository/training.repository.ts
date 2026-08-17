@@ -35,6 +35,77 @@ export class TrainingRepository {
     });
   }
 
+  async getLatestExerciseHistoryByUser(userSeq: number) {
+    const histories = await this.prisma.training_history.findMany({
+      where: {user_seq: userSeq},
+      orderBy: [
+        {training: {training_date: "desc"}},
+        {training_seq: "desc"},
+        {set_order: "asc"},
+        {seq: "asc"},
+      ],
+      select: {
+        training_seq: true,
+        training_category_seq: true,
+        name: true,
+        weight: true,
+        weight_unit: true,
+        reps: true,
+        set_order: true,
+        training: {
+          select: {training_date: true},
+        },
+      },
+    });
+
+    const latestByExercise = new Map<
+      string,
+      {
+        trainingSeq: number;
+        trainingCategorySeq: number | null;
+        name: string;
+        trainingDate: Date;
+        sets: Array<{
+          setOrder: number | null;
+          weight: number;
+          weightUnit: string;
+          reps: number;
+        }>;
+      }
+    >();
+
+    histories.forEach(history => {
+      const key = history.training_category_seq
+        ? `category:${history.training_category_seq}`
+        : `name:${history.name.trim().toLowerCase()}`;
+      const existing = latestByExercise.get(key);
+
+      if (existing && existing.trainingSeq !== history.training_seq) return;
+
+      const set = {
+        setOrder: history.set_order,
+        weight: Number(history.weight),
+        weightUnit: history.weight_unit,
+        reps: Number(history.reps),
+      };
+
+      if (existing) {
+        existing.sets.push(set);
+        return;
+      }
+
+      latestByExercise.set(key, {
+        trainingSeq: history.training_seq,
+        trainingCategorySeq: history.training_category_seq,
+        name: history.name,
+        trainingDate: history.training.training_date,
+        sets: [set],
+      });
+    });
+
+    return Array.from(latestByExercise.values());
+  }
+
   async getTrainingHistoryByTraining(trainingSeq: number) {
     return await this.prisma.training_history.findMany({
       where: {training_seq: trainingSeq},

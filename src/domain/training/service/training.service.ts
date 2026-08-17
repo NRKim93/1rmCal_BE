@@ -14,6 +14,10 @@ export class TrainingService {
         return history;
     }
 
+    async getLatestExerciseHistory(seq: number) {
+        return this.trainingRepo.getLatestExerciseHistoryByUser(seq);
+    }
+
     async getAllTrainingCategories(): Promise<TrainingCategories[]> {
         return await this.trainingRepo.getAllTrainingCategories(); 
     }

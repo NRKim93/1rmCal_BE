@@ -20,6 +20,15 @@ export class TrainingController {
         return await success(lastHistory);
     }
 
+    @Get('/getLatestExerciseHistory')
+    async getLatestExerciseHistory(@Req() req: AuthenticatedRequest) {
+        const history = await this.trainingService.getLatestExerciseHistory(
+            req.user.userSeq,
+        );
+
+        return await success(history);
+    }
+
     @Get('/getAllTrainingCategories')
     @Public()
     async getAllTrainingCategories() {
