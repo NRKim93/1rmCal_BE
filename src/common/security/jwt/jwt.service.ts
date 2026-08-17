@@ -18,6 +18,31 @@ export class JwtService {
     private cachedPrivateKey?: string;
     private cachedPublicKey?: string;
 
+    private getPositiveNumber(name: string): number {
+        const value = Number(this.configService.get<string>(name));
+
+        if (!Number.isFinite(value) || value <= 0) {
+            throw new Error(`${name} must be a positive number`);
+        }
+
+        return value;
+    }
+
+    private getCookieOptions(): {
+        maxAge: number;
+        domain?: string;
+        secure: boolean;
+    } {
+        const domain = this.configService.get<string>('COOKIE_DOMAIN')?.trim();
+        const secureValue = this.configService.get<string | boolean>('COOKIE_SECURE');
+
+        return {
+            maxAge: this.getPositiveNumber('COOKIE_EXPIRE_TIME'),
+            domain: domain || undefined,
+            secure: secureValue === true || String(secureValue).toLowerCase() === 'true',
+        };
+    }
+
     //  개인키 발급
     private getPrivateKey(): string {
         //
@@ -63,24 +88,38 @@ export class JwtService {
 
     //  AccessToken 생성
     async generateAccessToken(res:Response,userId:string): Promise<string> {
-        const exp = Number(process.env["JWT_EXPIRE_TIME"]);
+        const exp = this.getPositiveNumber('JWT_EXPIRE_TIME');
         const token = await this.signToken(exp,userId,{typ:'access'});
-        const cookieExp = Number(process.env["COOKIE_EXPIRE_TIME"]);
+        const cookie = this.getCookieOptions();
 
-        CookieUtil.setCookie(res, 'accessToken',token,cookieExp);
+        CookieUtil.setCookie(
+            res,
+            'accessToken',
+            token,
+            cookie.maxAge,
+            cookie.domain,
+            cookie.secure,
+        );
 
         return token;
     }
 
     //  RefreshToken 생성
     async generateRefreshToken(res:Response,userId:string): Promise<string> {
-        const exp = Number(process.env["REFRESH_EXPIRE_TIME"]);
+        const exp = this.getPositiveNumber('REFRESH_EXPIRE_TIME');
         const token = await this.signToken(exp,userId,{typ:'refresh'});
-        const cookieExp = Number(process.env["COOKIE_EXPIRE_TIME"]);
-        const pre = String(process.env["REFRESH_TOKEN"]);
+        const cookie = this.getCookieOptions();
+        const pre = String(this.configService.get('REFRESH_TOKEN'));
 
         await this.redis.hset(pre, userId, token);
-        CookieUtil.setCookie(res,pre,token,cookieExp);
+        CookieUtil.setCookie(
+            res,
+            pre,
+            token,
+            cookie.maxAge,
+            cookie.domain,
+            cookie.secure,
+        );
 
         return token;
     }
@@ -123,4 +162,4 @@ export class JwtService {
             payload,
         };
     }
-} 
+}

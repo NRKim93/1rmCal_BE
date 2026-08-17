@@ -8,11 +8,12 @@ export class CookieUtil {
         name : string,
         value : string,
         maxAge : number,
-        domain? : string
+        domain? : string,
+        secure = false,
     ) {
         const option : any = {
             httpOnly:true,
-            secure:false,
+            secure,
             sameSite:'lax',
             maxAge,
             path:'/',
@@ -27,11 +28,12 @@ export class CookieUtil {
     static clearCookie(
         res : Response,
         name : string,
-        domain? : string
+        domain? : string,
+        secure = false,
     ) {
         const option : any = {
             httpOnly : true,
-            secure : false,
+            secure,
             sameSite : 'lax',
             maxAge : 0,
             path:'/',
