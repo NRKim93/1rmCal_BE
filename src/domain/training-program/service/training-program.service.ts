@@ -197,6 +197,12 @@ export class TrainingProgramService {
             seq: day.seq,
             dayOrder: day.day_order,
             name: day.name,
+            lastPerformedAt:
+              (
+                day as typeof day & {
+                  trainings?: Array<{ training_date: Date }>;
+                }
+              ).trainings?.[0]?.training_date ?? null,
             exercises: day.training_program_exercises.map((exercise) => ({
               seq: exercise.seq,
               trainingCategorySeq: exercise.training_category_seq,

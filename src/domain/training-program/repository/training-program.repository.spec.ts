@@ -224,6 +224,18 @@ describe('TrainingProgramRepository', () => {
           ],
         },
         orderBy: [{ created_at: 'desc' }, { seq: 'desc' }],
+        include: expect.objectContaining({
+          training_program_days: expect.objectContaining({
+            include: expect.objectContaining({
+              trainings: {
+                where: { user_seq: 7 },
+                orderBy: { training_date: 'desc' },
+                take: 1,
+                select: { training_date: true },
+              },
+            }),
+          }),
+        }),
       }),
     );
   });

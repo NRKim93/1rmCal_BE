@@ -164,6 +164,12 @@ export class TrainingProgramRepository {
         training_program_days: {
           orderBy: [{ week_order: 'asc' }, { day_order: 'asc' }],
           include: {
+            trainings: {
+              where: { user_seq: userSeq },
+              orderBy: { training_date: 'desc' },
+              take: 1,
+              select: { training_date: true },
+            },
             training_program_exercises: {
               orderBy: { exercise_order: 'asc' },
               include: {
